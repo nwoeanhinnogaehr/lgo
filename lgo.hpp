@@ -25,6 +25,6 @@ struct BoardHasher {
 
 struct History {
     std::unordered_set<Board, BoardHasher> states;
-    void add(Board s) { states.insert(s); }
-    bool check(Board s) { return states.find(s) != states.end(); }
+    void add(const Board s) { states.insert(s); }
+    bool check(const Board s) const { return states.find(s) != states.end(); }
 };
