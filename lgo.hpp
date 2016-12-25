@@ -28,3 +28,16 @@ struct History {
     void add(const Board s) { states.insert(s); }
     bool check(const Board s) const { return states.find(s) != states.end(); }
 };
+
+struct State {
+    Board board;
+    History history;
+    enum GameState { ALIVE, PASS, GAME_OVER } gameState;
+};
+
+struct Move {
+    Move(Cell color, pos_t position, bool pass) : color(color), position(position), pass(pass) {}
+    Cell color;
+    pos_t position;
+    bool pass;
+};
