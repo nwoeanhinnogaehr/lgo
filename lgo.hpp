@@ -13,7 +13,7 @@ enum Cell : pos_t { EMPTY = 0, BLACK = 1, WHITE = 2 };
 struct Board {
     pos_t board = 0;
     inline Cell get(const pos_t pos) const { return Cell(board >> pos * CELL_WIDTH & CELL_MAX); }
-    inline Board set(const pos_t pos, const Cell color) {
+    inline void set(const pos_t pos, const Cell color) {
         board ^= board & CELL_MAX << pos * CELL_WIDTH ^ color << pos * CELL_WIDTH;
     }
     bool operator==(const Board o) const { return o.board == board; }
