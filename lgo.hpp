@@ -10,6 +10,13 @@ constexpr pos_t MAX_SIZE = sizeof(pos_t) * 8 / CELL_WIDTH; // max board size
 
 enum Cell : pos_t { EMPTY = 0, BLACK = 1, WHITE = 2 };
 
+struct Move {
+    Move(Cell color, pos_t position, bool pass) : color(color), position(position), pass(pass) {}
+    Cell color;
+    pos_t position;
+    bool pass;
+};
+
 struct Board {
     pos_t board = 0;
     inline Cell get(const pos_t pos) const { return Cell(board >> pos * CELL_WIDTH & CELL_MAX); }
@@ -32,12 +39,18 @@ struct History {
 struct State {
     Board board;
     History history;
-    enum GameState { ALIVE, PASS, GAME_OVER } gameState;
-};
-
-struct Move {
-    Move(Cell color, pos_t position, bool pass) : color(color), position(position), pass(pass) {}
-    Cell color;
-    pos_t position;
-    bool pass;
+    enum GameState { NORMAL, PASS, GAME_OVER } game_state = NORMAL;
+    void play(const Move move) {
+        if (move.pass) {
+            if (game_state == NORMAL)
+                game_state = PASS;
+            else if (game_state == PASS)
+                game_state = GAME_OVER;
+        } else {
+            board.set(move.position, move.color);
+            history.add(board);
+            game_state = NORMAL;
+        }
+    }
+    bool terminal() const { return game_state == GAME_OVER; }
 };

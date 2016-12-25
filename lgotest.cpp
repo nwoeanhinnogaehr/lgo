@@ -27,3 +27,18 @@ TEST_CASE("History works", "[history]") {
         }
     }
 }
+
+TEST_CASE("Passing twice results in a terminal state", "[state_pass]") {
+    State s;
+    REQUIRE(!s.terminal());
+    s.play(Move(BLACK, 0, false));
+    REQUIRE(!s.terminal());
+    s.play(Move(WHITE, 0, true));
+    REQUIRE(!s.terminal());
+    s.play(Move(BLACK, 3, false));
+    REQUIRE(!s.terminal());
+    s.play(Move(WHITE, 0, true));
+    REQUIRE(!s.terminal());
+    s.play(Move(BLACK, 0, true));
+    REQUIRE(s.terminal());
+}
