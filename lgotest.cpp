@@ -133,6 +133,7 @@ TEST_CASE("Legal moves size 2", "[state]") {
     REQUIRE(s.legal_moves(WHITE) == 0b10);
 
 }
+
 TEST_CASE("Legal moves size 3", "[state]") {
     State s(3);
     REQUIRE(s.legal_moves(BLACK) == 0b111);
@@ -171,7 +172,7 @@ TEST_CASE("Legal moves size 5", "[state]") {
 }
 
 TEST_CASE("Capture", "[state]") {
-    State s(8);
+    State s(16);
     s.play(Move(BLACK, 0));
     s.play(Move(WHITE, 1));
     REQUIRE(s.board.get(0) == EMPTY);
@@ -183,8 +184,17 @@ TEST_CASE("Capture", "[state]") {
     REQUIRE(s.board.get(2) == EMPTY);
     REQUIRE(s.board.get(3) == WHITE);
 
-    s.play(Move(WHITE, 7));
-    s.play(Move(BLACK, 6));
-    REQUIRE(s.board.get(6) == BLACK);
-    REQUIRE(s.board.get(7) == EMPTY);
+    s.play(Move(BLACK, 10));
+    s.play(Move(WHITE, 9));
+    s.play(Move(BLACK, 11));
+    s.play(Move(WHITE, 12));
+    REQUIRE(s.board.get(9) == WHITE);
+    REQUIRE(s.board.get(10) == EMPTY);
+    REQUIRE(s.board.get(11) == EMPTY);
+    REQUIRE(s.board.get(12) == WHITE);
+
+    s.play(Move(WHITE, 15));
+    s.play(Move(BLACK, 14));
+    REQUIRE(s.board.get(14) == BLACK);
+    REQUIRE(s.board.get(15) == EMPTY);
 }
