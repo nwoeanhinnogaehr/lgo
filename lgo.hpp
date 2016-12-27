@@ -9,6 +9,9 @@ constexpr pos_t CELL_WIDTH = 2; // number of bits per cell
 constexpr pos_t CELL_MAX = (1 << CELL_WIDTH) - 1;          // max value of a cell
 constexpr pos_t MAX_SIZE = sizeof(pos_t) * 8 / CELL_WIDTH; // max board size
 
+// literal suffix for pos_t
+pos_t operator"" _pos_t(unsigned long long v) { return v; }
+
 struct Cell {
     pos_t value;
     Cell(pos_t value) : value(value) {}
@@ -113,9 +116,9 @@ struct Board {
     }
     // remove all stones in a chain
     void clear_chain(Chain chain) {
-        pos_t mask = (chain.position + chain.size != MAX_SIZE) * // handle overflow edge case
-                         ~((1 << CELL_WIDTH * (chain.position + chain.size)) - 1) |
-                     ((1 << CELL_WIDTH * chain.position) - 1);
+        pos_t mask = (chain.position + chain.size != MAX_SIZE) *
+                         ~((1_pos_t << CELL_WIDTH * (chain.position + chain.size)) - 1) |
+                     ((1_pos_t << CELL_WIDTH * chain.position) - 1);
         board &= mask;
     }
     // clear any chains captured by a recent play at the given position
