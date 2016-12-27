@@ -144,7 +144,7 @@ TEST_CASE("Legal moves size 3", "[state]") {
     REQUIRE(s.legal_moves(WHITE) == 0b110);
 
     s.play(Move(WHITE, 2));
-    REQUIRE(s.legal_moves(BLACK) == 0b000);
+    REQUIRE(s.legal_moves(BLACK) == 0b010);
     REQUIRE(s.legal_moves(WHITE) == 0b010);
 }
 

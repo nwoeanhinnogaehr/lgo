@@ -113,29 +113,35 @@ struct Board {
     }
     // remove all stones in a chain
     void clear_chain(Chain chain) {
+        // we can make this O(1)
         for (pos_t i = 0; i < chain.size; i++)
             set(i + chain.position, EMPTY);
     }
     // clear any chains captured by a recent play at the given position
-    void clear_captured(pos_t position) {
+    bool clear_captured(pos_t position) {
+        return iter_captured(position, [this](Chain c) { clear_chain(c); });
+    }
+    bool iter_captured(pos_t position, std::function<void(Chain)> fn) {
         // this can probably be optimized
         assert(get(position).is_stone());
         auto ch = chains();
+        bool any = false;
         for (size_t i = 0; i < ch.size(); i++) {
             if (ch[i].cell.is_stone() &&
                 (position == ch[i].position - 1 || position == ch[i].position + ch[i].size)) {
                 // left boundary
                 if (i == 0 && i + 1 < ch.size() && ch[i + 1].cell.is_stone())
-                    clear_chain(ch[i]);
+                    fn(ch[i]), any |= true;
                 // right boundary
                 else if (i > 0 && i + 1 == ch.size() && ch[i - 1].cell.is_stone())
-                    clear_chain(ch[i]);
+                    fn(ch[i]), any |= true;
                 // middle
                 else if (i > 0 && i + 1 < ch.size() && ch[i - 1].cell.is_stone() &&
                          ch[i + 1].cell.is_stone() && ch[i - 1].cell == ch[i + 1].cell)
-                    clear_chain(ch[i]);
+                    fn(ch[i]), any |= true;
             }
         }
+        return any;
     }
     bool operator==(Board o) const { return o.board == board; }
     friend std::ostream &operator<<(std::ostream &os, Board board) {
@@ -200,16 +206,23 @@ struct State {
         auto ch = board.chains();
         for (size_t i = 0; i < ch.size(); i++) {
             if (ch[i].cell == EMPTY && ch[i].size == 1) {
-                // left suicide
-                if (i == 0 && i < ch.size() - 2 && ch[i + 1].cell == color.flip())
-                    illegal(ch[i].position);
-                // right suicide
-                else if (i == ch.size() - 1 && i > 1 && ch[i - 1].cell == color.flip())
-                    illegal(ch[i].position);
-                // middle suicide
-                else if (i > 0 && i < ch.size() - 1 && ch[i - 1].cell == color.flip() &&
-                         ch[i + 1].cell == color.flip())
-                    illegal(ch[i].position);
+                Board b = board;
+                b.set(ch[i].position, color);
+                bool captured = b.iter_captured(ch[i].position, [](Chain) {});
+
+                // suicide is possible only if we didn't capture any stones
+                if (!captured) {
+                    // left suicide
+                    if (i == 0 && i < ch.size() - 2 && ch[i + 1].cell == color.flip())
+                        illegal(ch[i].position);
+                    // right suicide
+                    else if (i == ch.size() - 1 && i > 1 && ch[i - 1].cell == color.flip())
+                        illegal(ch[i].position);
+                    // middle suicide
+                    else if (i > 0 && i < ch.size() - 1 && ch[i - 1].cell == color.flip() &&
+                             ch[i + 1].cell == color.flip())
+                        illegal(ch[i].position);
+                }
             }
         }
         return legal;
