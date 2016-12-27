@@ -11,7 +11,7 @@ constexpr pos_t MAX_SIZE = sizeof(pos_t) * 8 / CELL_WIDTH; // max board size
 
 struct Cell {
     pos_t value;
-    Cell(const pos_t value) : value(value) {}
+    Cell(pos_t value) : value(value) {}
 
     Cell flip() const {
         if (value == 1)
@@ -21,7 +21,7 @@ struct Cell {
         assert(false);
     }
     bool is_stone() const { return value == 1 || value == 2; }
-    bool operator==(const Cell o) const { return value == o.value; }
+    bool operator==(Cell o) const { return value == o.value; }
     operator bool() const { return value; }
     friend std::ostream &operator<<(std::ostream &os, const Cell cell) {
         os << ".BW"[cell.value];
@@ -36,37 +36,37 @@ struct Move {
     Cell color;
     pos_t position; // meaningless if is_pass is true
     bool is_pass;
-    Move(const Cell color, const pos_t position, const bool is_pass = false)
+    Move(Cell color, pos_t position, bool is_pass = false)
         : color(color), position(position), is_pass(is_pass) {}
-    static Move pass(const Cell color) { return Move(color, 0, true); }
+    static Move pass(Cell color) { return Move(color, 0, true); }
 };
 
 struct Score {
     pos_t black, white;
     Score() : black(0), white(0) {}
-    Score(const pos_t black, const pos_t white) : black(black), white(white) {}
+    Score(pos_t black, pos_t white) : black(black), white(white) {}
 
-    bool operator==(const Score o) const { return o.black == black && o.white == white; }
+    bool operator==(Score o) const { return o.black == black && o.white == white; }
 };
 
 // a group represents a sequence of stones with the same cell value
 struct Group {
     Cell cell;
     pos_t position, size;
-    Group(const Cell cell, const pos_t position, const pos_t size)
+    Group(Cell cell, pos_t position, pos_t size)
         : cell(cell), position(position), size(size) {}
 };
 
 struct Board {
     const pos_t size;
     pos_t board;
-    Board(const pos_t size) : size(size), board(0) {}
+    Board(pos_t size) : size(size), board(0) {}
 
-    inline Cell get(const pos_t pos) const {
+    inline Cell get(pos_t pos) const {
         assert(pos < size);
         return Cell(board >> pos * CELL_WIDTH & CELL_MAX);
     }
-    inline void set(const pos_t pos, const Cell cell) {
+    inline void set(pos_t pos, Cell cell) {
         assert(pos < size);
         assert(cell.value <= CELL_MAX);
         board ^= (board & CELL_MAX << pos * CELL_WIDTH) ^ cell.value << pos * CELL_WIDTH;
@@ -113,7 +113,7 @@ struct Board {
         return groups;
     }
     // remove all stones in a group
-    void clear_group(const Group group) {
+    void clear_group(Group group) {
         for (pos_t i = 0; i < group.size; i++)
             set(i + group.position, EMPTY);
     }
@@ -121,7 +121,7 @@ struct Board {
     void clear_captured(pos_t position) {
         // this can probably be optimized
         assert(get(position).is_stone());
-        const auto g = groups();
+        auto g = groups();
         for (size_t i = 0; i < g.size(); i++) {
             if (g[i].cell.is_stone() &&
                 (position == g[i].position - 1 || position == g[i].position + g[i].size)) {
@@ -138,8 +138,8 @@ struct Board {
             }
         }
     }
-    bool operator==(const Board o) const { return o.board == board; }
-    friend std::ostream &operator<<(std::ostream &os, const Board board) {
+    bool operator==(Board o) const { return o.board == board; }
+    friend std::ostream &operator<<(std::ostream &os, Board board) {
         for (pos_t i = 0; i < board.size; i++)
             os << board.get(i);
         return os;
@@ -147,15 +147,15 @@ struct Board {
 };
 
 struct BoardHasher {
-    size_t operator()(const Board b) const { return b.board; }
+    size_t operator()(Board b) const { return b.board; }
 };
 
 struct History {
     std::unordered_set<Board, BoardHasher> states;
 
-    void add(const Board s) { states.insert(s); }
+    void add(Board s) { states.insert(s); }
     // returns true if the given board has previously been added
-    bool check(const Board s) const { return states.find(s) != states.end(); }
+    bool check(Board s) const { return states.find(s) != states.end(); }
 };
 
 struct State {
@@ -165,7 +165,7 @@ struct State {
     State(pos_t size) : board(size) {}
 
     bool terminal() const { return game_state == GAME_OVER; }
-    void play(const Move move) {
+    void play(Move move) {
         assert(game_state != GAME_OVER);
         if (move.is_pass) {
             if (game_state == NORMAL)
@@ -183,7 +183,7 @@ struct State {
         }
     }
     // retuns a bitset of all legal moves for a given color
-    pos_t legal_moves(const Cell color) const {
+    pos_t legal_moves(Cell color) const {
         assert(color.is_stone());
         pos_t legal = board.empty_set();
         auto illegal = [&](pos_t i) { legal &= ~(1 << i); };
@@ -219,11 +219,11 @@ struct State {
 
     // append legal moves of a specific type and color to a vector.
     // TODO
-    void atari_moves(const Cell color, std::vector<Move> &moves) const {}
-    void cell_2_conjecture(const Cell color, std::vector<Move> &moves) const {}
-    void safe_moves(const Cell color, std::vector<Move> &moves) const {}
-    void other_moves(const Cell color, std::vector<Move> &moves) const {}
-    void moves(const Cell color, std::vector<Move> &moves) const {
+    void atari_moves(Cell color, std::vector<Move> &moves) const {}
+    void cell_2_conjecture(Cell color, std::vector<Move> &moves) const {}
+    void safe_moves(Cell color, std::vector<Move> &moves) const {}
+    void other_moves(Cell color, std::vector<Move> &moves) const {}
+    void moves(Cell color, std::vector<Move> &moves) const {
         moves.push_back(Move::pass(color));
         atari_moves(color, moves);
         cell_2_conjecture(color, moves);
