@@ -22,6 +22,7 @@ struct Cell {
         if (value == 2)
             return Cell(1);
         assert(false);
+        return Cell(-1);
     }
     bool is_stone() const { return value == 1 || value == 2; }
     bool operator==(Cell o) const { return value == o.value; }
