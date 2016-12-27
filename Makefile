@@ -1,5 +1,5 @@
 CXX ?= g++
-CXXFLAGS += -std=c++11 -g -O3
+CXXFLAGS += -std=c++11 -g -O3 -Wall -Wextra
 OBJ_FILES := $(patsubst %.cpp,%.o,$(wildcard *.cpp))
 
 all : test
