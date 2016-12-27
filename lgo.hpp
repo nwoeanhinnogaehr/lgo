@@ -49,12 +49,11 @@ struct Score {
     bool operator==(Score o) const { return o.black == black && o.white == white; }
 };
 
-// a group represents a sequence of stones with the same cell value
-struct Group {
+// a chain represents a sequence of stones with the same cell value
+struct Chain {
     Cell cell;
     pos_t position, size;
-    Group(Cell cell, pos_t position, pos_t size)
-        : cell(cell), position(position), size(size) {}
+    Chain(Cell cell, pos_t position, pos_t size) : cell(cell), position(position), size(size) {}
 };
 
 struct Board {
@@ -101,40 +100,40 @@ struct Board {
             res <<= 1, res |= get(i) == EMPTY;
         return res;
     }
-    // retuns a vector of all groups on the board, ordered.
-    std::vector<Group> groups() const {
-        std::vector<Group> groups{Group(get(0), 0, 1)};
+    // retuns a vector of all chains on the board, ordered.
+    std::vector<Chain> chains() const {
+        std::vector<Chain> chains{Chain(get(0), 0, 1)};
         for (pos_t i = 1; i < size; i++) {
-            if (get(i) == groups.back().cell)
-                groups.back().size++;
+            if (get(i) == chains.back().cell)
+                chains.back().size++;
             else
-                groups.push_back(Group(get(i), i, 1));
+                chains.push_back(Chain(get(i), i, 1));
         }
-        return groups;
+        return chains;
     }
-    // remove all stones in a group
-    void clear_group(Group group) {
-        for (pos_t i = 0; i < group.size; i++)
-            set(i + group.position, EMPTY);
+    // remove all stones in a chain
+    void clear_chain(Chain chain) {
+        for (pos_t i = 0; i < chain.size; i++)
+            set(i + chain.position, EMPTY);
     }
-    // clear any groups captured by a recent play at the given position
+    // clear any chains captured by a recent play at the given position
     void clear_captured(pos_t position) {
         // this can probably be optimized
         assert(get(position).is_stone());
-        auto g = groups();
-        for (size_t i = 0; i < g.size(); i++) {
-            if (g[i].cell.is_stone() &&
-                (position == g[i].position - 1 || position == g[i].position + g[i].size)) {
+        auto ch = chains();
+        for (size_t i = 0; i < ch.size(); i++) {
+            if (ch[i].cell.is_stone() &&
+                (position == ch[i].position - 1 || position == ch[i].position + ch[i].size)) {
                 // left boundary
-                if (i == 0 && i + 1 < g.size() && g[i + 1].cell.is_stone())
-                    clear_group(g[i]);
+                if (i == 0 && i + 1 < ch.size() && ch[i + 1].cell.is_stone())
+                    clear_chain(ch[i]);
                 // right boundary
-                else if (i > 0 && i + 1 == g.size() && g[i - 1].cell.is_stone())
-                    clear_group(g[i]);
+                else if (i > 0 && i + 1 == ch.size() && ch[i - 1].cell.is_stone())
+                    clear_chain(ch[i]);
                 // middle
-                else if (i > 0 && i + 1 < g.size() && g[i - 1].cell.is_stone() &&
-                         g[i + 1].cell.is_stone() && g[i - 1].cell == g[i + 1].cell)
-                    clear_group(g[i]);
+                else if (i > 0 && i + 1 < ch.size() && ch[i - 1].cell.is_stone() &&
+                         ch[i + 1].cell.is_stone() && ch[i - 1].cell == ch[i + 1].cell)
+                    clear_chain(ch[i]);
             }
         }
     }
@@ -198,20 +197,19 @@ struct State {
         }
 
         // check liberties
-        auto groups = board.groups();
-        for (size_t i = 0; i < groups.size(); i++) {
-            const Group g = groups[i];
-            if (g.cell == EMPTY && g.size == 1) {
+        auto ch = board.chains();
+        for (size_t i = 0; i < ch.size(); i++) {
+            if (ch[i].cell == EMPTY && ch[i].size == 1) {
                 // left suicide
-                if (i == 0 && i < groups.size() - 2 && groups[i + 1].cell == color.flip())
-                    illegal(g.position);
+                if (i == 0 && i < ch.size() - 2 && ch[i + 1].cell == color.flip())
+                    illegal(ch[i].position);
                 // right suicide
-                else if (i == groups.size() - 1 && i > 1 && groups[i - 1].cell == color.flip())
-                    illegal(g.position);
+                else if (i == ch.size() - 1 && i > 1 && ch[i - 1].cell == color.flip())
+                    illegal(ch[i].position);
                 // middle suicide
-                else if (i > 0 && i < groups.size() - 1 && groups[i - 1].cell == color.flip() &&
-                         groups[i + 1].cell == color.flip())
-                    illegal(g.position);
+                else if (i > 0 && i < ch.size() - 1 && ch[i - 1].cell == color.flip() &&
+                         ch[i + 1].cell == color.flip())
+                    illegal(ch[i].position);
             }
         }
         return legal;
