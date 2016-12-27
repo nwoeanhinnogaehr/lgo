@@ -184,6 +184,16 @@ TEST_CASE("Capture", "[state]") {
     REQUIRE(s.board.get(2) == EMPTY);
     REQUIRE(s.board.get(3) == WHITE);
 
+    s.play(Move(BLACK, 4));
+    s.play(Move(WHITE, 7));
+    s.play(Move(BLACK, 6));
+    s.play(Move(WHITE, 5));
+    REQUIRE(s.board.get(3) == WHITE);
+    REQUIRE(s.board.get(4) == EMPTY);
+    REQUIRE(s.board.get(5) == WHITE);
+    REQUIRE(s.board.get(6) == EMPTY);
+    REQUIRE(s.board.get(7) == WHITE);
+
     s.play(Move(BLACK, 10));
     s.play(Move(WHITE, 9));
     s.play(Move(BLACK, 11));
