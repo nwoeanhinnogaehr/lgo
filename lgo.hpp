@@ -113,9 +113,10 @@ struct Board {
     }
     // remove all stones in a chain
     void clear_chain(Chain chain) {
-        // we can make this O(1)
-        for (pos_t i = 0; i < chain.size; i++)
-            set(i + chain.position, EMPTY);
+        pos_t mask = (chain.position + chain.size != MAX_SIZE) * // handle overflow edge case
+                         ~((1 << CELL_WIDTH * (chain.position + chain.size)) - 1) |
+                     ((1 << CELL_WIDTH * chain.position) - 1);
+        board &= mask;
     }
     // clear any chains captured by a recent play at the given position
     bool clear_captured(pos_t position) {
