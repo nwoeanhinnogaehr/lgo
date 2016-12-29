@@ -1,11 +1,15 @@
 CXX ?= g++
-CXXFLAGS += -std=c++11 -g -O3 -Wall -Wextra
+CXXFLAGS += -std=c++11 -g -O3 -Wall -Wextra -march=native
+#CXXFLAGS += -NDEBUG
 OBJ_FILES := $(patsubst %.cpp,%.o,$(wildcard *.cpp))
 
-all : test
+all : test ab
 
 test : test.o lgotest.o
-	$(CXX) $^ -o $@ $(CXXFLAGS)
+	$(CXX) $(CXXFLAGS) $^ -o $@
+
+ab : ab.o
+	$(CXX) $(CXXFLAGS) $^ -o $@
 
 test.o : test.cpp catch.hpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@

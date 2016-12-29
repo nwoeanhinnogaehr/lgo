@@ -3,7 +3,7 @@
 
 TEST_CASE("Board get/set works properly", "[board]") {
     for (pos_t i = 0; i < MAX_SIZE; i++) {
-        Board s(MAX_SIZE);
+        Board<MAX_SIZE> s;
         for (pos_t c = 0; c < CELL_MAX; c++) {
             s.set(i, Cell(c));
             REQUIRE(s.get(i) == Cell(c));
@@ -16,8 +16,8 @@ TEST_CASE("Board get/set works properly", "[board]") {
 }
 
 TEST_CASE("History works", "[history]") {
-    History h;
-    Board s(MAX_SIZE);
+    History<MAX_SIZE> h;
+    Board<MAX_SIZE> s;
     for (pos_t i = 0; i < MAX_SIZE; i++) {
         for (pos_t c = 1; c < CELL_MAX; c++) {
             s.set(i, Cell(c));
@@ -29,17 +29,17 @@ TEST_CASE("History works", "[history]") {
 }
 
 TEST_CASE("Passing twice results in a terminal state", "[state]") {
-    State s(MAX_SIZE);
+    State<MAX_SIZE> s;
     REQUIRE(!s.terminal());
     s.play(Move(BLACK, 0));
     REQUIRE(!s.terminal());
-    s.play(Move::pass(WHITE));
+    s.play(Move(WHITE));
     REQUIRE(!s.terminal());
     s.play(Move(BLACK, 3));
     REQUIRE(!s.terminal());
-    s.play(Move::pass(WHITE));
+    s.play(Move(WHITE));
     REQUIRE(!s.terminal());
-    s.play(Move::pass(BLACK));
+    s.play(Move(BLACK));
     REQUIRE(s.terminal());
 }
 
@@ -52,7 +52,7 @@ template <> struct StringMaker<Score> {
 }
 
 TEST_CASE("Board scoring size 1", "[board]") {
-    Board b(1);
+    Board<1> b;
     REQUIRE(b.score() == Score(0, 0));
     b.set(0, BLACK);
     REQUIRE(b.score() == Score(1, 0));
@@ -61,7 +61,7 @@ TEST_CASE("Board scoring size 1", "[board]") {
 }
 
 TEST_CASE("Board scoring size 2", "[board]") {
-    Board b(2);
+    Board<2> b;
     REQUIRE(b.score() == Score(0, 0));
     b.set(0, BLACK);
     REQUIRE(b.score() == Score(2, 0));
@@ -76,7 +76,7 @@ TEST_CASE("Board scoring size 2", "[board]") {
 }
 
 TEST_CASE("Board scoring size 3", "[board]") {
-    Board b(3);
+    Board<3> b;
     REQUIRE(b.score() == Score(0, 0));
     b.set(1, BLACK);
     REQUIRE(b.score() == Score(3, 0));
@@ -93,7 +93,7 @@ TEST_CASE("Board scoring size 3", "[board]") {
 }
 
 TEST_CASE("Board scoring size 4", "[board]") {
-    Board b(4);
+    Board<4> b;
     REQUIRE(b.score() == Score(0, 0));
     b.set(1, BLACK);
     REQUIRE(b.score() == Score(4, 0));
@@ -110,32 +110,29 @@ TEST_CASE("Board scoring size 4", "[board]") {
 }
 
 TEST_CASE("Legal moves size 1", "[state]") {
-    State s(1);
-    REQUIRE(s.legal_moves(BLACK) == 0b1);
-    REQUIRE(s.legal_moves(WHITE) == 0b1);
-
-    s.play(Move(BLACK, 0)); // wlog white
+    State<1> s;
+    // no one can play because the stone would have no liberties
     REQUIRE(s.legal_moves(BLACK) == 0b0);
     REQUIRE(s.legal_moves(WHITE) == 0b0);
 }
 
 TEST_CASE("Legal moves size 2", "[state]") {
-    State s(2);
+    State<2> s;
     REQUIRE(s.legal_moves(BLACK) == 0b11);
     REQUIRE(s.legal_moves(WHITE) == 0b11);
 
     s.play(Move(BLACK, 1));
-    REQUIRE(s.legal_moves(BLACK) == 0b01);
+    REQUIRE(s.legal_moves(BLACK) == 0b00);
     REQUIRE(s.legal_moves(WHITE) == 0b01);
 
     s.play(Move(WHITE, 0)); // capture black stone
     REQUIRE(s.legal_moves(BLACK) == 0b00); // would recreate previous state
-    REQUIRE(s.legal_moves(WHITE) == 0b10);
+    REQUIRE(s.legal_moves(WHITE) == 0b00);
 
 }
 
 TEST_CASE("Legal moves size 3", "[state]") {
-    State s(3);
+    State<3> s;
     REQUIRE(s.legal_moves(BLACK) == 0b111);
     REQUIRE(s.legal_moves(WHITE) == 0b111);
 
@@ -145,11 +142,11 @@ TEST_CASE("Legal moves size 3", "[state]") {
 
     s.play(Move(WHITE, 2));
     REQUIRE(s.legal_moves(BLACK) == 0b010);
-    REQUIRE(s.legal_moves(WHITE) == 0b010);
+    REQUIRE(s.legal_moves(WHITE) == 0b000);
 }
 
 TEST_CASE("Legal moves size 5", "[state]") {
-    State s(5);
+    State<5> s;
     // All moves possible at start of game
     REQUIRE(s.legal_moves(BLACK) == 0b11111);
     REQUIRE(s.legal_moves(WHITE) == 0b11111);
@@ -163,7 +160,7 @@ TEST_CASE("Legal moves size 5", "[state]") {
     REQUIRE(s.legal_moves(WHITE) == 0b10100);
 
     s.play(Move(BLACK, 0));
-    REQUIRE(s.legal_moves(BLACK) == 0b00100);
+    REQUIRE(s.legal_moves(BLACK) == 0b00000);
     REQUIRE(s.legal_moves(WHITE) == 0b10100);
 
     s.play(Move(WHITE, 2));
@@ -172,7 +169,7 @@ TEST_CASE("Legal moves size 5", "[state]") {
 }
 
 TEST_CASE("Capture", "[state]") {
-    State s(16);
+    State<16> s;
     s.play(Move(BLACK, 0));
     s.play(Move(WHITE, 1));
     REQUIRE(s.board.get(0) == EMPTY);
@@ -194,17 +191,40 @@ TEST_CASE("Capture", "[state]") {
     REQUIRE(s.board.get(6) == EMPTY);
     REQUIRE(s.board.get(7) == WHITE);
 
+    s.play(Move(BLACK, 9));
+    s.play(Move(WHITE, 8));
     s.play(Move(BLACK, 10));
-    s.play(Move(WHITE, 9));
-    s.play(Move(BLACK, 11));
-    s.play(Move(WHITE, 12));
-    REQUIRE(s.board.get(9) == WHITE);
+    s.play(Move(WHITE, 11));
+    REQUIRE(s.board.get(8) == WHITE);
+    REQUIRE(s.board.get(9) == EMPTY);
     REQUIRE(s.board.get(10) == EMPTY);
-    REQUIRE(s.board.get(11) == EMPTY);
-    REQUIRE(s.board.get(12) == WHITE);
+    REQUIRE(s.board.get(11) == WHITE);
 
     s.play(Move(WHITE, 15));
-    s.play(Move(BLACK, 14));
-    REQUIRE(s.board.get(14) == BLACK);
+    s.play(Move(WHITE, 14));
+    s.play(Move(BLACK, 13));
+    REQUIRE(s.board.get(13) == BLACK);
+    REQUIRE(s.board.get(14) == EMPTY);
     REQUIRE(s.board.get(15) == EMPTY);
+}
+
+TEST_CASE("Indirect capture", "[state]") {
+    State<5> s;
+    REQUIRE(s.legal_moves(BLACK) == 0b11111);
+    REQUIRE(s.legal_moves(WHITE) == 0b11111);
+    s.play(Move(BLACK, 0));
+    REQUIRE(s.legal_moves(BLACK) == 0b11110);
+    REQUIRE(s.legal_moves(WHITE) == 0b11110);
+    s.play(Move(BLACK, 2));
+    REQUIRE(s.legal_moves(BLACK) == 0b11010);
+    REQUIRE(s.legal_moves(WHITE) == 0b11010);
+    s.play(Move(WHITE, 3));
+    REQUIRE(s.legal_moves(BLACK) == 0b10000);
+    REQUIRE(s.legal_moves(WHITE) == 0b00010);
+    s.play(Move(BLACK, 4));
+    REQUIRE(s.legal_moves(BLACK) == 0b01010);
+    REQUIRE(s.legal_moves(WHITE) == 0b00010);
+    s.play(Move(WHITE, 1));
+    REQUIRE(s.legal_moves(BLACK) == 0b00000);
+    REQUIRE(s.legal_moves(WHITE) == 0b01000);
 }
