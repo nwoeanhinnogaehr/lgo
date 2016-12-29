@@ -183,11 +183,11 @@ template <pos_t size> struct State {
     enum GameState { NORMAL, PASS, GAME_OVER } game_state = NORMAL;
     Board<size> board;
     History<size> history;
-    std::stack<std::tuple<Move, GameState, Board<size>>> past;
+    std::stack<std::tuple<GameState, Board<size>>> past;
 
     bool terminal() const { return game_state == GAME_OVER; }
     void play(Move move) {
-        past.emplace(move, game_state, board);
+        past.emplace(game_state, board);
         assert(game_state != GAME_OVER);
         if (move.is_pass) {
             if (game_state == NORMAL)
@@ -207,10 +207,9 @@ template <pos_t size> struct State {
     void undo() {
         auto prev = past.top();
         past.pop();
-        Move m = std::get<0>(prev);
-        GameState gs = std::get<1>(prev);
-        Board<size> b = std::get<2>(prev);
-        if (!m.is_pass)
+        GameState gs = std::get<0>(prev);
+        Board<size> b = std::get<1>(prev);
+        if (!(b == board))
             history.remove(board);
         game_state = gs;
         board = b;
