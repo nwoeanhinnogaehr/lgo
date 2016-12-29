@@ -110,6 +110,9 @@ template <pos_t size> struct Board {
     }
     // remove all stones in range [start, end)
     void clear_chain(pos_t start, pos_t end) {
+        assert(start < size);
+        assert(end <= size);
+        assert(start < end);
         pos_t mask = (end != MAX_SIZE) * ~((1_pos_t << CELL_WIDTH * end) - 1) |
                      ((1_pos_t << CELL_WIDTH * start) - 1);
         board &= mask;
@@ -150,7 +153,7 @@ template <pos_t size> struct Board {
         }
         // suicide
         if ((i >= size || get(i) == opponent) && (j >= size || get(j) == opponent) && j != i) {
-            clear_chain(i + 1, j + 1);
+            clear_chain(i + 1, j);
             captured++;
         }
         return captured;
