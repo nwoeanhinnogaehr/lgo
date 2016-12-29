@@ -26,23 +26,30 @@
 */
 
 template<pos_t size>
-int alphabeta_black(State<size> &s, int alpha, int beta);
+int alphabeta_black(State<size> &s, int alpha, int beta, int depth);
 template<pos_t size>
-int alphabeta_white(State<size> &s, int alpha, int beta);
+int alphabeta_white(State<size> &s, int alpha, int beta, int depth);
 
+int term;
+std::vector<std::vector<Move>> moves;
 template<pos_t size>
-int alphabeta_white(State<size> &s, int alpha, int beta) {
+int alphabeta_white(State<size> &s, int alpha, int beta, int depth) {
     if (s.terminal()) {
+        term++;
         Score ss = s.board.score();
         return ss.black - ss.white;
     }
-    std::vector<Move> moves;
-    moves.reserve(size + 1);
-    s.moves(WHITE, moves);
+    if (depth >= moves.size()) {
+        moves.emplace_back();
+        moves[depth].reserve(size + 1);
+    } else {
+        moves[depth].clear();
+    }
+    s.moves(WHITE, moves[depth]);
     int v = INT_MAX;
-    for (Move m : moves) {
+    for (Move m : moves[depth]) {
         s.play(m);
-        v = std::min(v, alphabeta_black(s, alpha, beta));
+        v = std::min(v, alphabeta_black(s, alpha, beta, depth + 1));
         s.undo();
         beta = std::min(beta, v);
         if (beta <= alpha)
@@ -51,18 +58,23 @@ int alphabeta_white(State<size> &s, int alpha, int beta) {
     return v;
 }
 template<pos_t size>
-int alphabeta_black(State<size> &s, int alpha, int beta) {
+int alphabeta_black(State<size> &s, int alpha, int beta, int depth) {
     if (s.terminal()) {
+        term++;
         Score ss = s.board.score();
         return ss.black - ss.white;
     }
-    std::vector<Move> moves;
-    moves.reserve(size + 1);
-    s.moves(BLACK, moves);
+    if (depth >= moves.size()) {
+        moves.emplace_back();
+        moves[depth].reserve(size + 1);
+    } else {
+        moves[depth].clear();
+    }
+    s.moves(BLACK, moves[depth]);
     int v = INT_MIN;
-    for (Move m : moves) {
+    for (Move m : moves[depth]) {
         s.play(m);
-        v = std::max(v, alphabeta_white(s, alpha, beta));
+        v = std::max(v, alphabeta_white(s, alpha, beta, depth + 1));
         s.undo();
         alpha = std::max(alpha, v);
         if (beta <= alpha)
@@ -73,5 +85,6 @@ int alphabeta_black(State<size> &s, int alpha, int beta) {
 
 int main() {
     State<6> s;
-    std::cout << "minimax " << alphabeta_black(s, INT32_MIN, INT32_MAX) << std::endl;
+    std::cout << "minimax " << alphabeta_black(s, INT32_MIN, INT32_MAX, 0) << std::endl;
+    std::cout << term << " terminal states" << std::endl;
 }
