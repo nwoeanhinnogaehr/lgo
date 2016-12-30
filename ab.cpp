@@ -1,7 +1,8 @@
 #include "lgo.hpp"
 #include <algorithm>
-#include <iostream>
 #include <climits>
+#include <iostream>
+#include <unordered_map>
 
 /*
 01 function alphabeta(node, depth, α, β, maximizingPlayer)
@@ -25,66 +26,70 @@
 19          return v;
 */
 
-template<pos_t size>
-int alphabeta_black(State<size> &s, int alpha, int beta, int depth);
-template<pos_t size>
-int alphabeta_white(State<size> &s, int alpha, int beta, int depth);
+template <pos_t size>
+struct AlphaBeta {
+    std::vector<std::vector<Move>> moves;
+    size_t state_visits;
+    std::unordered_map<Board<size>, int, BoardHasher<size>> board_visits;
 
-int term;
-std::vector<std::vector<Move>> moves;
-template<pos_t size>
-int alphabeta_white(State<size> &s, int alpha, int beta, int depth) {
-    if (s.terminal()) {
-        term++;
-        Score ss = s.board.score();
-        return ss.black - ss.white;
+    int alphabeta_white(State<size> &s, int alpha, int beta, size_t depth) {
+        state_visits++;
+        board_visits[s.board]++;
+        if (s.terminal()) {
+            Score ss = s.board.score();
+            return ss.black - ss.white;
+        }
+        if (depth >= moves.size()) {
+            moves.emplace_back();
+            moves[depth].reserve(size + 1);
+        }
+        s.moves(WHITE, moves[depth]);
+        int v = INT_MAX;
+        for (Move m : moves[depth]) {
+            s.play(m);
+            v = std::min(v, alphabeta_black(s, alpha, beta, depth + 1));
+            s.undo();
+            beta = std::min(beta, v);
+            if (beta <= alpha)
+                return beta;
+        }
+        return v;
     }
-    if (depth >= moves.size()) {
-        moves.emplace_back();
-        moves[depth].reserve(size + 1);
-    } else {
-        moves[depth].clear();
+    int alphabeta_black(State<size> &s, int alpha, int beta, size_t depth) {
+        state_visits++;
+        board_visits[s.board]++;
+        if (s.terminal()) {
+            Score ss = s.board.score();
+            return ss.black - ss.white;
+        }
+        if (depth >= moves.size()) {
+            moves.emplace_back();
+            moves[depth].reserve(size + 1);
+        }
+        s.moves(BLACK, moves[depth]);
+        int v = INT_MIN;
+        for (Move m : moves[depth]) {
+            s.play(m);
+            v = std::max(v, alphabeta_white(s, alpha, beta, depth + 1));
+            s.undo();
+            alpha = std::max(alpha, v);
+            if (beta <= alpha)
+                return alpha;
+        }
+        return v;
     }
-    s.moves(WHITE, moves[depth]);
-    int v = INT_MAX;
-    for (Move m : moves[depth]) {
-        s.play(m);
-        v = std::min(v, alphabeta_black(s, alpha, beta, depth + 1));
-        s.undo();
-        beta = std::min(beta, v);
-        if (beta <= alpha)
-            break;
+    int alphabeta() {
+        State<size> s;
+        return alphabeta_black(s, INT32_MIN, INT32_MAX, 0);
     }
-    return v;
-}
-template<pos_t size>
-int alphabeta_black(State<size> &s, int alpha, int beta, int depth) {
-    if (s.terminal()) {
-        term++;
-        Score ss = s.board.score();
-        return ss.black - ss.white;
-    }
-    if (depth >= moves.size()) {
-        moves.emplace_back();
-        moves[depth].reserve(size + 1);
-    } else {
-        moves[depth].clear();
-    }
-    s.moves(BLACK, moves[depth]);
-    int v = INT_MIN;
-    for (Move m : moves[depth]) {
-        s.play(m);
-        v = std::max(v, alphabeta_white(s, alpha, beta, depth + 1));
-        s.undo();
-        alpha = std::max(alpha, v);
-        if (beta <= alpha)
-            break;
-    }
-    return v;
-}
+};
 
 int main() {
-    State<6> s;
-    std::cout << "minimax " << alphabeta_black(s, INT32_MIN, INT32_MAX, 0) << std::endl;
-    std::cout << term << " terminal states" << std::endl;
+    AlphaBeta<6> ab;
+    int minimax = ab.alphabeta();
+    for (auto it : ab.board_visits) {
+        std::cout << it.first << " -> " << it.second << std::endl;
+    }
+    std::cout << "minimax " << minimax << std::endl;
+    std::cout << "states " << ab.state_visits << std::endl;
 }
