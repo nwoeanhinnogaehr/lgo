@@ -286,7 +286,6 @@ template <pos_t size> struct State {
                 moves.emplace_back(color, i);
     }
     void moves(Cell color, std::vector<Move> &moves) const {
-        moves.clear();
         pos_t legal = legal_moves(color);
         moves.emplace_back(color); // pass
         //cell_2_conjecture_simple(color, legal, moves);
