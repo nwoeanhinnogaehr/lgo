@@ -5,10 +5,10 @@ OBJ_FILES := $(patsubst %.cpp,%.o,$(wildcard *.cpp))
 
 all : test ab
 
-test : test.o lgotest.o abtest.o lgo.o
+test : test.o lgotest.o abtest.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
-ab : ab.o lgo.o
+ab : ab.o
 	$(CXX) $(CXXFLAGS) $^ -o $@
 
 test.o : test.cpp catch.hpp

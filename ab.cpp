@@ -3,32 +3,57 @@
 
 constexpr pos_t size = 6;
 
-void print_pv_tree(PVNode n, State<size>& s, int depth) {
-    if (n.move.color == EMPTY)
+void print_pv_tree(PVNode n, State<size> &s, int depth) {
+    Move m = n.get_move();
+    if (m.color == EMPTY)
         std::cout << "init:\t";
-    else if (n.move.is_pass)
-        std::cout << n.move.color << " pass:\t";
+    else if (m.is_pass)
+        std::cout << m.color << " pass:\t";
     else
-        std::cout << n.move.color << " " << n.move.position << ":\t";
+        std::cout << m.color << " " << m.position << ":\t";
 
-    if (n.move.color != EMPTY)
-        s.play(n.move);
+    if (m.color != EMPTY)
+        s.play(m);
     for (int i = 0; i < depth; i++)
         std::cout << "+";
     std::cout << s.board << std::endl;
-    for (PVNode c : n.children) {
+    for (PVNode c : n.children)
         print_pv_tree(c, s, depth + 1);
-    }
-    if (n.move.color != EMPTY)
+    if (m.color != EMPTY)
         s.undo();
 }
 
+State<size> print_path(std::vector<PVNode> path, State<size> root) {
+    std::reverse(path.begin(), path.end());
+    for (PVNode n : path) {
+        Move m = n.get_move();
+        if (m.color == EMPTY)
+            std::cout << "init:\t";
+        else if (m.is_pass)
+            std::cout << m.color << " pass:\t";
+        else
+            std::cout << m.color << " " << m.position << ":\t";
+
+        if (m.color != EMPTY && !m.is_pass) {
+            root.play(m);
+        }
+        std::cout << root.board << std::endl;
+    }
+    return root;
+}
+
 int main() {
-    AlphaBeta<size> ab;
-    ab.construct_tree = true;
+    AlphaBeta<size, PVNode> ab;
     State<size> root;
+
     PVNode ret = ab.alphabeta(root, BLACK);
-    print_pv_tree(ret, root, 0);
-    std::cout << "minimax " << ret.minimax << std::endl;
-    std::cout << "states " << ab.state_visits << std::endl;
+
+    std::cout << "\nlongest PV:\n";
+    print_path(ret.get_longest_path(), root);
+
+    std::cout << "\nshortest PV:\n";
+    print_path(ret.get_shortest_path(), root);
+
+    std::cout << "\nminimax " << ret.minimax << "\n";
+    std::cout << "states " << ab.state_visits << "\n";
 }
