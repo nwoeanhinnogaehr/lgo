@@ -289,8 +289,10 @@ template <pos_t size> struct State {
         pos_t legal = legal_moves(color);
 
         // symmetry at root
-        if (legal == ((1 << size) - 1))
-            legal &= ~((1 << size / 2) - 1);
+        if (legal == ((1 << size) - 1)) {
+            legal &= ((1 << ((size - 1) / 2 + 1)) - 1); // mirror moves
+            legal &= ~1; // and first cell
+        }
 
         moves.emplace_back(color); // pass
         //cell_2_conjecture_simple(color, legal, moves);
