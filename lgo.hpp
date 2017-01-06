@@ -287,6 +287,11 @@ template <pos_t size> struct State {
     }
     void moves(Cell color, std::vector<Move> &moves) const {
         pos_t legal = legal_moves(color);
+
+        // symmetry at root
+        if (legal == ((1 << size) - 1))
+            legal &= ~((1 << size / 2) - 1);
+
         moves.emplace_back(color); // pass
         //cell_2_conjecture_simple(color, legal, moves);
         cell_2_conjecture_full(color, legal, moves);
