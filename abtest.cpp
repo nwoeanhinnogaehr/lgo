@@ -101,3 +101,53 @@ TEST_CASE("lgo_small pv 6:0,4", "[alphabeta]") {
     s.play(Move(WHITE, 4));
     REQUIRE(ab.alphabeta(s, BLACK).get_minimax() == -6);
 }
+TEST_CASE("lgo_small pv 6:1,2", "[alphabeta]") {
+    AlphaBeta<6> ab;
+    State<6> s;
+    s.play(Move(BLACK, 1));
+    s.play(Move(WHITE, 2));
+    REQUIRE(ab.alphabeta(s, BLACK).get_minimax() == 6);
+}
+TEST_CASE("lgo_small pv 6:1,3", "[alphabeta]") {
+    AlphaBeta<6> ab;
+    State<6> s;
+    s.play(Move(BLACK, 1));
+    s.play(Move(WHITE, 3));
+    REQUIRE(ab.alphabeta(s, BLACK).get_minimax() == 6);
+}
+TEST_CASE("lgo_small pv 6:0", "[alphabeta]") {
+    AlphaBeta<6> ab;
+    State<6> s;
+    s.play(Move(BLACK, 0));
+    REQUIRE(ab.alphabeta(s, WHITE).get_minimax() == -6);
+}
+TEST_CASE("lgo_small pv 6:2", "[alphabeta]") {
+    AlphaBeta<6> ab;
+    State<6> s;
+    s.play(Move(BLACK, 2));
+    REQUIRE(ab.alphabeta(s, WHITE).get_minimax() == -1);
+}
+TEST_CASE("lgo_small pv 6:2,1,3", "[alphabeta]") {
+    AlphaBeta<6> ab;
+    State<6> s;
+    s.play(Move(BLACK, 2));
+    s.play(Move(WHITE, 1));
+    s.play(Move(BLACK, 3));
+    REQUIRE(ab.alphabeta(s, WHITE).get_minimax() == -6);
+}
+TEST_CASE("lgo_small pv 6:2,1,4", "[alphabeta]") {
+    AlphaBeta<6> ab;
+    State<6> s;
+    s.play(Move(BLACK, 2));
+    s.play(Move(WHITE, 1));
+    s.play(Move(BLACK, 4));
+    REQUIRE(ab.alphabeta(s, WHITE).get_minimax() == -6);
+}
+TEST_CASE("lgo_small pv 6:2,1,5", "[alphabeta]") {
+    AlphaBeta<6> ab;
+    State<6> s;
+    s.play(Move(BLACK, 2));
+    s.play(Move(WHITE, 1));
+    s.play(Move(BLACK, 5));
+    REQUIRE(ab.alphabeta(s, WHITE).get_minimax() == -6);
+}
