@@ -1,8 +1,8 @@
 #include "lgo.hpp"
 #include <algorithm>
 #include <climits>
-#include <unordered_map>
 #include <functional>
+#include <unordered_map>
 
 /*
 01 function alphabeta(node, depth, α, β, maximizingPlayer)
@@ -83,7 +83,7 @@ template <pos_t size, typename NodeT = SimpleNode> struct AlphaBeta {
     size_t state_visits = 0;
     std::unordered_map<Board<size>, int, BoardHasher<size>> board_visits;
 
-    NodeT alphabeta(State<size> &s, Cell color, int alpha = -size, int beta = size,
+    NodeT alphabeta(State<size> &s, Cell color, int alpha = -size - 1, int beta = size + 1,
                     size_t depth = 0) {
         state_visits++;
         board_visits[s.board]++;
@@ -109,7 +109,8 @@ template <pos_t size, typename NodeT = SimpleNode> struct AlphaBeta {
                 pv.set_minimax(child.get_minimax());
                 pv.clear_children();
             }
-            if (child.get_minimax() == pv.get_minimax())
+            if (child.get_minimax() == pv.get_minimax() && child.get_minimax() > alpha &&
+                child.get_minimax() < beta)
                 pv.add_child(child);
             if (compare(pv.get_minimax(), param))
                 param = pv.get_minimax();
