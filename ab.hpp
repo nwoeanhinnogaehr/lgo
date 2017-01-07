@@ -26,97 +26,127 @@
 19          return v;
 */
 
-bool greater(int a, int b) { return a > b; }
-bool less(int a, int b) { return a < b; }
-
-// Since constructing the whole principal variation tree is so much slower than just finding the
-// minimax value, two seperate node implementations are here so you can avoid redundant computation.
-// It's not really ideal, but it works for now. to be improved later.
-struct PVNode {
-    PVNode(int minimax) : move(EMPTY), minimax(minimax) {}
-    Move move;
-    int minimax;
-    std::vector<PVNode> children;
-
-    void set_move(Move m) { move = m; }
-    Move get_move() const { return move; }
-    void set_minimax(int val) { minimax = val; }
-    int get_minimax() const { return minimax; }
-    void add_child(PVNode &child) { children.emplace_back(child); }
-    void clear_children() { children.clear(); }
-
-    std::vector<PVNode> get_shortest_path() { return get_path(INT_MAX, less); }
-    std::vector<PVNode> get_longest_path() { return get_path(INT_MIN, greater); }
-    std::vector<PVNode> get_path(int init, std::function<bool(int, int)> compare) {
-        if (children.size() == 0)
-            return std::vector<PVNode>{*this};
-
-        int best_size = init;
-        std::vector<PVNode> best_child;
-        for (size_t i = 0; i < children.size(); i++) {
-            auto child = children[i].get_path(init, compare);
-            int child_size = child.size() + 1;
-            if (compare(child_size, best_size)) {
-                best_size = child_size;
-                best_child = child;
-            }
+namespace ab {
+template <pos_t size> struct Minimax {
+    typedef int return_t;
+    typedef int minimax_t;
+    static constexpr minimax_t alpha_init() { return -size; }
+    static constexpr minimax_t beta_init() { return size; }
+    return_t return_init(Cell color) const { return color == BLACK ? -size : size; }
+    void on_enter(State<size> &s, Cell color, minimax_t alpha, minimax_t beta, size_t depth) {}
+    void on_exit(State<size> &s, Cell color, minimax_t alpha, minimax_t beta, size_t depth) {}
+    return_t evaluate(const State<size> &s) const {
+        Score ss = s.board.score();
+        return minimax_t(ss.black) - minimax_t(ss.white);
+    }
+    void update(Move move, minimax_t &alpha, minimax_t &beta, return_t &parent,
+                const return_t &child) const {
+        if (move.color == BLACK) {
+            parent = std::max(parent, child);
+            alpha = std::max(alpha, parent);
+        } else {
+            parent = std::min(parent, child);
+            beta = std::min(beta, parent);
         }
-        best_child.push_back(*this);
-        return best_child;
     }
 };
-// SimpleNode only stores the minimax value, discarding everything else
-struct SimpleNode {
-    SimpleNode(int minimax) : minimax(minimax) {}
-    int minimax;
 
-    void set_move(Move m) {}
-    Move get_move() const { return Move(EMPTY); }
-    void set_minimax(int val) { minimax = val; }
-    int get_minimax() const { return minimax; }
-    void add_child(SimpleNode &child) {}
-    void clear_children() {}
-};
+template <pos_t size> struct PV {
+    struct Node {
+        Node(int minimax) : move(EMPTY), minimax(minimax) {}
+        Move move;
+        int minimax;
+        std::vector<Node> children;
 
-template <pos_t size, typename NodeT = SimpleNode> struct AlphaBeta {
-    std::vector<std::vector<Move>> moves;
-    size_t state_visits = 0;
-    std::unordered_map<Board<size>, int, BoardHasher<size>> board_visits;
-
-    NodeT alphabeta(State<size> &s, Cell color, int alpha = -size - 1, int beta = size + 1,
-                    size_t depth = 0) {
-        state_visits++;
-        board_visits[s.board]++;
-        if (s.terminal()) {
-            Score ss = s.board.score();
-            return NodeT(int(ss.black) - int(ss.white));
+        std::vector<Node> get_shortest_path() const {
+            return get_path(INT_MAX, [](int a, int b) { return a < b; });
         }
+        std::vector<Node> get_longest_path() const {
+            return get_path(INT_MIN, [](int a, int b) { return a > b; });
+        }
+        std::vector<Node> get_path(int init, std::function<bool(int, int)> compare) const {
+            if (children.size() == 0)
+                return std::vector<Node>{*this};
+
+            int best_size = init;
+            std::vector<Node> best_child;
+            for (size_t i = 0; i < children.size(); i++) {
+                auto child = children[i].get_path(init, compare);
+                int child_size = child.size() + 1;
+                if (compare(child_size, best_size)) {
+                    best_size = child_size;
+                    best_child = child;
+                }
+            }
+            best_child.push_back(*this);
+            return best_child;
+        }
+    };
+    int call_count = 0;
+    typedef Node return_t;
+    typedef int minimax_t;
+    static constexpr minimax_t alpha_init() { return -size - 1; }
+    static constexpr minimax_t beta_init() { return size + 1; }
+    static constexpr return_t return_init(Cell color) { return color == BLACK ? -size : size; }
+    void on_enter(State<size> &s, Cell color, minimax_t alpha, minimax_t beta, size_t depth) {
+        call_count++;
+    }
+    void on_exit(State<size> &s, Cell color, minimax_t alpha, minimax_t beta, size_t depth) {}
+    return_t evaluate(const State<size> &s) const {
+        Score ss = s.board.score();
+        return return_t(minimax_t(ss.black) - minimax_t(ss.white));
+    }
+    void update(Move move, minimax_t &alpha, minimax_t &beta, return_t &parent,
+                return_t &child) const {
+        child.move = move;
+        if (move.color == BLACK) {
+            if (child.minimax > parent.minimax) {
+                parent.minimax = child.minimax;
+                parent.children.clear();
+            }
+            if (child.minimax == parent.minimax && child.minimax > alpha && child.minimax < beta)
+                parent.children.push_back(child);
+            alpha = std::max(alpha, parent.minimax);
+        } else {
+            if (child.minimax < parent.minimax) {
+                parent.minimax = child.minimax;
+                parent.children.clear();
+            }
+            if (child.minimax == parent.minimax && child.minimax > alpha && child.minimax < beta)
+                parent.children.push_back(child);
+            beta = std::min(beta, parent.minimax);
+        }
+    }
+};
+}
+
+template <pos_t size, template <pos_t> typename Impl = ab::Minimax> struct AlphaBeta {
+    std::vector<std::vector<Move>> moves;
+    Impl<size> impl;
+
+    typename Impl<size>::return_t
+    alphabeta(State<size> &state, Cell color,
+              typename Impl<size>::minimax_t alpha = Impl<size>::alpha_init(),
+              typename Impl<size>::minimax_t beta = Impl<size>::beta_init(), size_t depth = 0) {
+        impl.on_enter(state, color, alpha, beta, depth);
+        if (state.terminal())
+            return impl.evaluate(state);
         if (depth >= moves.size()) {
             moves.emplace_back();
-            moves[depth].reserve(size + 1);
+            moves[depth].reserve(size + 1); // max # moves is board size + pass
         } else
             moves[depth].clear();
-        s.moves(color, moves[depth]);
-        auto compare = color == BLACK ? greater : less;
-        int &param = color == BLACK ? alpha : beta;
-        NodeT pv(color == BLACK ? -size : size);
-        for (Move m : moves[depth]) {
-            s.play(m);
-            NodeT child = alphabeta(s, color.flip(), alpha, beta, depth + 1);
-            s.undo();
-            child.set_move(m);
-            if (compare(child.get_minimax(), pv.get_minimax())) {
-                pv.set_minimax(child.get_minimax());
-                pv.clear_children();
-            }
-            if (child.get_minimax() == pv.get_minimax() && child.get_minimax() > alpha &&
-                child.get_minimax() < beta)
-                pv.add_child(child);
-            if (compare(pv.get_minimax(), param))
-                param = pv.get_minimax();
+        state.moves(color, moves[depth]);
+        auto parent = impl.return_init(color);
+        for (Move move : moves[depth]) {
+            state.play(move);
+            auto child = alphabeta(state, color.flip(), alpha, beta, depth + 1);
+            state.undo();
+            impl.update(move, alpha, beta, parent, child);
             if (beta <= alpha)
                 break;
         }
-        return pv;
+        impl.on_exit(state, color, alpha, beta, depth);
+        return parent;
     }
 };

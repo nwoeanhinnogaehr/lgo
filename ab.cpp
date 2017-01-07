@@ -3,8 +3,9 @@
 
 constexpr pos_t size = 6;
 
-void print_pv_tree(PVNode n, State<size> &s, int depth) {
-    Move m = n.get_move();
+void print_pv_tree(ab::PV<size>::Node n, State<size> &s, int depth) {
+    std::cout << n.minimax << "\t";
+    Move m = n.move;
     if (m.color == EMPTY)
         std::cout << "init:\t";
     else if (m.is_pass)
@@ -17,16 +18,16 @@ void print_pv_tree(PVNode n, State<size> &s, int depth) {
     for (int i = 0; i < depth; i++)
         std::cout << "+";
     std::cout << s.board << std::endl;
-    for (PVNode c : n.children)
+    for (auto c : n.children)
         print_pv_tree(c, s, depth + 1);
     if (m.color != EMPTY)
         s.undo();
 }
 
-State<size> print_path(std::vector<PVNode> path, State<size> root) {
+State<size> print_path(std::vector<ab::PV<size>::Node> path, State<size> root) {
     std::reverse(path.begin(), path.end());
-    for (PVNode n : path) {
-        Move m = n.get_move();
+    for (auto n : path) {
+        Move m = n.move;
         if (m.color == EMPTY)
             std::cout << "init:\t";
         else if (m.is_pass)
@@ -43,17 +44,19 @@ State<size> print_path(std::vector<PVNode> path, State<size> root) {
 }
 
 int main() {
-    AlphaBeta<size, PVNode> ab;
+    AlphaBeta<size, ab::PV> ab;
     State<size> root;
 
-    PVNode ret = ab.alphabeta(root, BLACK);
+    auto node = ab.alphabeta(root, BLACK);
+
+    print_pv_tree(node, root, 0);
 
     std::cout << "\nlongest PV:\n";
-    print_path(ret.get_longest_path(), root);
+    print_path(node.get_longest_path(), root);
 
     std::cout << "\nshortest PV:\n";
-    print_path(ret.get_shortest_path(), root);
+    print_path(node.get_shortest_path(), root);
 
-    std::cout << "\nminimax " << ret.minimax << "\n";
-    std::cout << "states " << ab.state_visits << "\n";
+    std::cout << "\nminimax " << node.minimax << "\n";
+    std::cout << "states " << ab.impl.call_count << "\n";
 }
