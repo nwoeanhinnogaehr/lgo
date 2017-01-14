@@ -32,13 +32,16 @@ template <pos_t size> struct Minimax {
     typedef int minimax_t;
     static constexpr minimax_t alpha_init() { return -size; }
     static constexpr minimax_t beta_init() { return size; }
-    return_t return_init(Cell color) const { return color == BLACK ? -size : size; }
-    void on_enter(State<size> &s, Cell color, minimax_t alpha, minimax_t beta, size_t depth) {}
-    void on_exit(State<size> &s, Cell color, minimax_t alpha, minimax_t beta, size_t depth) {}
-    return_t evaluate(const State<size> &s) const {
-        Score ss = s.board.score();
-        return minimax_t(ss.black) - minimax_t(ss.white);
+    return_t on_enter(State<size> &s, Cell color, minimax_t alpha, minimax_t beta, size_t depth,
+                      bool &terminal) {
+        if ((terminal = s.terminal())) {
+            Score ss = s.board.score();
+            return return_t(minimax_t(ss.black) - minimax_t(ss.white));
+        }
+        return color == BLACK ? -size : size;
     }
+    void on_exit(State<size> &s, Cell color, minimax_t alpha, minimax_t beta, size_t depth,
+                 return_t &value) {}
     void update(Move move, minimax_t &alpha, minimax_t &beta, return_t &parent,
                 const return_t &child) const {
         if (move.color == BLACK) {
@@ -51,7 +54,7 @@ template <pos_t size> struct Minimax {
     }
 };
 
-template <pos_t size> struct PV {
+template <pos_t size> struct PV : Minimax<size> {
     struct Node {
         Node(int minimax) : move(EMPTY), minimax(minimax) {}
         Move move;
@@ -84,18 +87,14 @@ template <pos_t size> struct PV {
     };
     int call_count = 0;
     typedef Node return_t;
-    typedef int minimax_t;
-    static constexpr minimax_t alpha_init() { return -size - 1; }
-    static constexpr minimax_t beta_init() { return size + 1; }
-    static constexpr return_t return_init(Cell color) { return color == BLACK ? -size : size; }
-    void on_enter(State<size> &s, Cell color, minimax_t alpha, minimax_t beta, size_t depth) {
+    typedef typename Minimax<size>::return_t minimax_t;
+    return_t on_enter(State<size> &s, Cell color, minimax_t alpha, minimax_t beta, size_t depth,
+                      bool &terminal) {
         call_count++;
+        return Minimax<size>::on_enter(s, color, alpha, beta, depth, terminal);
     }
-    void on_exit(State<size> &s, Cell color, minimax_t alpha, minimax_t beta, size_t depth) {}
-    return_t evaluate(const State<size> &s) const {
-        Score ss = s.board.score();
-        return return_t(minimax_t(ss.black) - minimax_t(ss.white));
-    }
+    void on_exit(State<size> &s, Cell color, minimax_t alpha, minimax_t beta, size_t depth,
+                 return_t &value) {}
     void update(Move move, minimax_t &alpha, minimax_t &beta, return_t &parent,
                 return_t &child) const {
         child.move = move;
@@ -118,26 +117,47 @@ template <pos_t size> struct PV {
         }
     }
 };
+
+template <pos_t size, typename Impl> struct TranspositionTable : public Impl {
+    typedef typename Impl::return_t return_t;
+    typedef typename Impl::minimax_t minimax_t;
+    std::unordered_map<State<size>, return_t, StateHasher<size>> table;
+
+    return_t on_enter(State<size> &state, Cell color, minimax_t alpha, minimax_t beta, size_t depth,
+                      bool &terminal) {
+        auto ret = table.find(state);
+        if (ret != table.end()) {
+            terminal = true;
+            return ret->second;
+        }
+        return Impl::on_enter(state, color, alpha, beta, depth, terminal);
+    }
+    void on_exit(State<size> &state, Cell color, minimax_t alpha, minimax_t beta, size_t depth,
+                 return_t &value) {
+        Impl::on_exit(state, color, alpha, beta, depth, value);
+        table.insert({state, value});
+    }
+};
 }
 
-template <pos_t size, template <pos_t> typename Impl = ab::Minimax> struct AlphaBeta {
+template <pos_t size, typename Impl = ab::Minimax<size>> struct AlphaBeta {
     std::vector<std::vector<Move>> moves;
-    Impl<size> impl;
+    Impl impl;
 
-    typename Impl<size>::return_t
-    alphabeta(State<size> &state, Cell color,
-              typename Impl<size>::minimax_t alpha = Impl<size>::alpha_init(),
-              typename Impl<size>::minimax_t beta = Impl<size>::beta_init(), size_t depth = 0) {
-        impl.on_enter(state, color, alpha, beta, depth);
-        if (state.terminal())
-            return impl.evaluate(state);
+    typename Impl::return_t alphabeta(State<size> &state, Cell color,
+                                      typename Impl::minimax_t alpha = Impl::alpha_init(),
+                                      typename Impl::minimax_t beta = Impl::beta_init(),
+                                      size_t depth = 0) {
+        bool terminal = false;
+        auto parent = impl.on_enter(state, color, alpha, beta, depth, terminal);
+        if (terminal)
+            return parent;
         if (depth >= moves.size()) {
             moves.emplace_back();
             moves[depth].reserve(size + 1); // max # moves is board size + pass
         } else
             moves[depth].clear();
         state.moves(color, moves[depth]);
-        auto parent = impl.return_init(color);
         for (Move move : moves[depth]) {
             state.play(move);
             auto child = alphabeta(state, color.flip(), alpha, beta, depth + 1);
@@ -146,7 +166,7 @@ template <pos_t size, template <pos_t> typename Impl = ab::Minimax> struct Alpha
             if (beta <= alpha)
                 break;
         }
-        impl.on_exit(state, color, alpha, beta, depth);
+        impl.on_exit(state, color, alpha, beta, depth, parent);
         return parent;
     }
 };

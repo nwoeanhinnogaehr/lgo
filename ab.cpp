@@ -44,7 +44,7 @@ State<size> print_path(std::vector<ab::PV<size>::Node> path, State<size> root) {
 }
 
 int main() {
-    AlphaBeta<size, ab::PV> ab;
+    AlphaBeta<size, ab::PV<size>> ab;
     State<size> root;
 
     auto node = ab.alphabeta(root, BLACK);

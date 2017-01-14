@@ -177,6 +177,10 @@ template <pos_t size> struct History {
     void remove(Board<size> s) { states.erase(s); }
     // returns true if the given board has previously been added
     bool check(Board<size> s) const { return states.find(s) != states.end(); }
+
+    bool operator==(History h) const {
+        return h.states == states;
+    }
 };
 
 template <pos_t size> struct State {
@@ -291,14 +295,21 @@ template <pos_t size> struct State {
         // symmetry at root
         if (legal == ((1 << size) - 1)) {
             legal &= ((1 << ((size - 1) / 2 + 1)) - 1); // mirror moves
-            legal &= ~1; // and first cell
+            legal &= ~1;                                // and first cell
         }
 
         moves.emplace_back(color); // pass
-        //cell_2_conjecture_simple(color, legal, moves);
+        // cell_2_conjecture_simple(color, legal, moves);
         cell_2_conjecture_full(color, legal, moves);
         atari_moves(color, legal, moves);
         safe_moves(color, legal, moves);
         other_moves(color, legal, moves);
     }
+    bool operator==(State s) const {
+        return s.board == board && s.history == history && s.game_state == game_state;
+    }
+};
+
+template <pos_t size> struct StateHasher {
+    size_t operator()(State<size> b) const { return b.board.board; }
 };
