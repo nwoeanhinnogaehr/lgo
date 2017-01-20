@@ -1,5 +1,6 @@
 #pragma once
 
+#include <bitset>
 #include <cassert>
 #include <cstdint>
 #include <iostream>
@@ -167,21 +168,30 @@ template <pos_t size> struct Board {
     }
 };
 
+// a board is it's own hash code!
 template <pos_t size> struct BoardHasher {
     size_t operator()(Board<size> b) const { return b.board; }
 };
 
-template <pos_t size> struct History {
+// specialize history to use a bitset (fast) if it will fit in memory,
+// or a hashmap (slow) otherwise.
+template <pos_t size, typename = void> struct History;
+template <pos_t size> struct History<size, std::enable_if_t<(size >= 16)>> {
     std::unordered_set<Board<size>, BoardHasher<size>> states;
-
     void add(Board<size> s) { states.insert(s); }
     void remove(Board<size> s) { states.erase(s); }
-    // returns true if the given board has previously been added
     bool check(Board<size> s) const { return states.find(s) != states.end(); }
-
+    bool operator==(History h) const { return h.states == states; }
+};
+template <pos_t size> struct History<size, std::enable_if_t<(size < 16)>> {
+    std::bitset<1ul << (size * 2)> states;
+    void add(Board<size> s) { states[s.board] = true; }
+    void remove(Board<size> s) { states[s.board] = false; }
+    bool check(Board<size> s) const { return states[s.board]; }
     bool operator==(History h) const { return h.states == states; }
 };
 
+// Zobrist hashing for states.
 template <pos_t size, typename Hash = size_t> struct ZobristHasher {
     static constexpr size_t MAX_DEPTH = 1000;
     Hash table[MAX_DEPTH][size + 1][CELL_MAX];
@@ -206,6 +216,7 @@ template <pos_t size> struct State {
     Board<size> board;
     History<size> history;
     std::stack<std::tuple<GameState, Board<size>, Move>> past;
+    Cell to_play = BLACK;
     size_t hash = 0;
     static ZobristHasher<size> hasher;
 
@@ -228,6 +239,7 @@ template <pos_t size> struct State {
             history.add(board);
             game_state = NORMAL;
         }
+        to_play = move.color.flip();
     }
     void undo() {
         auto prev = past.top();
@@ -239,6 +251,7 @@ template <pos_t size> struct State {
             history.remove(board);
         game_state = gs;
         board = b;
+        to_play = m.color;
         hash = hasher.update(hash, past.size(), m);
     }
     // retuns a bitset of all legal moves for a given color
@@ -315,13 +328,29 @@ template <pos_t size> struct State {
     void moves(Cell color, std::vector<Move> &moves) const {
         pos_t legal = legal_moves(color);
 
+        // if moves is already initialized, prune any illegal moves and update legal
+        bool has_pass = false;
+        for (size_t i = 0; i < moves.size(); i++) {
+            Move m = moves[i];
+            assert(m.color == color);
+            if (m.is_pass)
+                has_pass = true;
+            else {
+                if (!(legal & (1 << m.position)))
+                    moves.erase(moves.begin() + i--);
+                else
+                    legal &= ~(1 << m.position);
+            }
+        }
+        if (!has_pass)
+            moves.emplace_back(color);
+
         // symmetry at root
         if (legal == ((1 << size) - 1)) {
             legal &= ((1 << ((size - 1) / 2 + 1)) - 1); // mirror moves
             legal &= ~1;                                // and first cell
         }
 
-        moves.emplace_back(color); // pass
         // cell_2_conjecture_simple(color, legal, moves);
         cell_2_conjecture_full(color, legal, moves);
         atari_moves(color, legal, moves);
@@ -329,7 +358,8 @@ template <pos_t size> struct State {
         other_moves(color, legal, moves);
     }
     bool operator==(State s) const {
-        return s.board == board && s.history == history && s.game_state == game_state;
+        return s.hash == hash && s.board == board && s.game_state == game_state &&
+               s.to_play == to_play && s.history == history;
     }
 };
 template <pos_t size> ZobristHasher<size> State<size>::hasher;

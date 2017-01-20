@@ -1,6 +1,6 @@
-CXX ?= g++
-CXXFLAGS += -std=c++11 -g -O3 -Wall -Wextra -march=native -Wno-unused-parameter
-#CXXFLAGS += -DNDEBUG
+CXX = /usr/bin/g++
+CXXFLAGS += -std=c++14 -g -O3 -Wall -Wextra -march=native -Wno-unused-parameter
+CXXFLAGS += -DNDEBUG
 OBJ_FILES := $(patsubst %.cpp,%.o,$(wildcard *.cpp))
 
 all : test ab
