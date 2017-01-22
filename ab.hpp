@@ -71,14 +71,17 @@ template <pos_t size> struct PV : Minimax<size> {
                 return_t &child) const {
         child.move = move;
         if (move.color == BLACK && child.minimax >= parent.minimax) {
-            parent.type = Node::MIN;
             parent.exact &= child.exact;
+            if (parent.type != Node::PV)
+                parent.type = Node::MIN;
         }
         if (move.color == WHITE && child.minimax <= parent.minimax) {
-            parent.type = Node::MAX;
             parent.exact &= child.exact;
+            if (parent.type != Node::PV)
+                parent.type = Node::MAX;
         }
         if (child.minimax > alpha && child.minimax < beta) {
+            parent.exact &= child.exact;
             parent.child = std::make_shared<Node>(child);
             parent.type = Node::PV;
         }
