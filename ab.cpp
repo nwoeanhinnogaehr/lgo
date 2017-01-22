@@ -22,7 +22,7 @@ State<size> print_path(std::vector<Move> path, State<size> root) {
 
 int main() {
     IterativeDeepening<size, AlphaBeta> ab;
-    //AlphaBeta<size, ab::PV<size>> ab;
+    //AlphaBeta<size, PV<size>> ab;
     State<size> root;
 
     auto node = ab.search(root);

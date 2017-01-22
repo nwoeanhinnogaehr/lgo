@@ -5,7 +5,6 @@
 #include <memory>
 #include <unordered_map>
 
-namespace ab {
 template <pos_t size> struct Minimax {
     struct Node {
         Node(int minimax) : minimax(minimax) {}
@@ -86,9 +85,8 @@ template <pos_t size> struct PV : Minimax<size> {
         Minimax<size>::update(move, alpha, beta, parent, child);
     }
 };
-}
 
-template <pos_t size, typename Impl = ab::Minimax<size>> struct AlphaBeta {
+template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
     std::vector<std::vector<Move>> moves;
     Impl impl;
 
@@ -145,7 +143,7 @@ template <pos_t size, typename T> struct TranspositionTable {
     }
 };
 
-template <pos_t size, template <pos_t, typename> typename ABImpl, typename Impl = ab::PV<size>>
+template <pos_t size, template <pos_t, typename> typename ABImpl, typename Impl = PV<size>>
 struct IterativeDeepening {
     struct Node : Impl::return_t {
         Node(typename Impl::minimax_t impl) : Impl::return_t(impl), best_move(EMPTY) {}
