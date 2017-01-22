@@ -217,6 +217,8 @@ struct IterativeDeepening {
         }
         void gen_moves(const State<size> &state, std::vector<Move> &moves) {
             // init with best move from TT entry
+            // except make sure pass is always first
+            moves.emplace_back(state.to_play);
             if (entry)
                 moves.emplace_back(entry->node.best_move);
 
