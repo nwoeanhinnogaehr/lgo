@@ -123,7 +123,10 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
 
 template <pos_t size, typename T> struct TranspositionTable {
     struct Entry {
-        State<size> state;
+        Board<size> board;
+        History<size> history;
+        typename State<size>::GameState game_state;
+        size_t hash;
         T val;
         bool valid = false;
     };
@@ -134,14 +137,19 @@ template <pos_t size, typename T> struct TranspositionTable {
     TranspositionTable() { table = new Entry[SIZE]; }
     ~TranspositionTable() { delete[] table; }
     void insert(const State<size> &state, const T &val) {
-        Entry &e = table[hasher(state) % SIZE];
-        e.state = state;
+        size_t hash = hasher(state);
+        Entry &e = table[hash % SIZE];
+        e.hash = hash;
+        e.board = state.board;
+        e.history = state.history;
+        e.game_state = state.game_state;
         e.val = val;
         e.valid = true;
     }
     T *lookup(const State<size> &state) {
-        Entry *e = &table[hasher(state) % SIZE];
-        if (e->valid && e->state == state)
+        size_t hash = hasher(state);
+        Entry *e = &table[hash % SIZE];
+        if (e->valid && e->hash == hash && e->board == state.board && e->game_state == state.game_state && e->history == state.history)
             return &e->val;
         return nullptr;
     }
