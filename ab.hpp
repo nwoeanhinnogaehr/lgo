@@ -107,14 +107,15 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
         } else
             moves[depth].clear();
         impl.gen_moves(state, moves[depth]);
-        for (Move move : moves[depth]) {
-            state.play(move);
-            auto child = search(state, alpha, beta, depth + 1);
-            state.undo();
-            impl.update(move, alpha, beta, parent, child);
-            if (beta <= alpha)
-                break;
-        }
+        if (beta > alpha)
+            for (Move move : moves[depth]) {
+                state.play(move);
+                auto child = search(state, alpha, beta, depth + 1);
+                state.undo();
+                impl.update(move, alpha, beta, parent, child);
+                if (beta <= alpha)
+                    break;
+            }
         impl.on_exit(state, alpha, beta, depth, parent);
         return parent;
     }
@@ -183,6 +184,7 @@ struct IterativeDeepening {
 
         return_t on_enter(State<size> &state, minimax_t &alpha, minimax_t &beta, size_t depth,
                           bool &terminal) {
+            // NOTE: does not call Impl::on_enter
             searched++;
             if (depth >= cutoff) { // hit max depth, return heuristic score
                 terminal = true;
@@ -210,10 +212,11 @@ struct IterativeDeepening {
             }
             return true_score(state.to_play == BLACK ? alpha_init() : beta_init());
         }
-        void on_exit(const State<size> &state, minimax_t alpha, minimax_t beta, size_t depth,
+        void on_exit(const State<size> &state, minimax_t &alpha, minimax_t &beta, size_t depth,
                      const return_t &value) {
             if (value.exact)
                 tt.insert(state, TTEntry(value));
+            Impl::on_exit(state, alpha, beta, depth, value);
         }
         void gen_moves(const State<size> &state, std::vector<Move> &moves) {
             // init with best move from TT entry
@@ -248,3 +251,5 @@ struct IterativeDeepening {
         }
     }
 };
+template <pos_t size, typename Impl = PV<size>>
+struct IterativeDeepeningAlphaBeta : IterativeDeepening<size, AlphaBeta, Impl> {};

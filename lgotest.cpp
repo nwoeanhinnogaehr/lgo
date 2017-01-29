@@ -21,9 +21,9 @@ TEST_CASE("History works", "[history]") {
     for (pos_t i = 0; i < MAX_SIZE; i++) {
         for (pos_t c = 1; c < CELL_MAX; c++) {
             s.set(i, Cell(c));
-            REQUIRE(!h.check(s));
+            REQUIRE(!h.contains(s));
             h.add(s);
-            REQUIRE(h.check(s));
+            REQUIRE(h.contains(s));
         }
     }
 }

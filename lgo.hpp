@@ -32,6 +32,7 @@ struct Cell {
         return Cell(-1);
     }
     bool is_stone() const { return value == 1 || value == 2; }
+    bool is_empty() const { return value == 0; }
     bool operator==(Cell o) const { return value == o.value; }
     operator bool() const { return value; }
     friend std::ostream &operator<<(std::ostream &os, const Cell cell) {
@@ -94,11 +95,11 @@ template <pos_t size> struct Board {
         }
         for (pos_t i = 0; i < size; i++) {
             Cell left = left_smear.get(i), right = right_smear.get(i);
-            if ((left == BLACK && (left == right || right == EMPTY)) ||
-                (right == BLACK && left == EMPTY))
+            if ((left == BLACK && (left == right || right.is_empty())) ||
+                (right == BLACK && left.is_empty()))
                 sc.black++;
-            if ((left == WHITE && (left == right || right == EMPTY)) ||
-                (right == WHITE && left == EMPTY))
+            if ((left == WHITE && (left == right || right.is_empty())) ||
+                (right == WHITE && left.is_empty()))
                 sc.white++;
         }
         return sc;
@@ -107,7 +108,7 @@ template <pos_t size> struct Board {
     pos_t empty_set() const {
         pos_t res = 0;
         for (pos_t i = size; i--;)
-            res <<= 1, res |= get(i) == EMPTY;
+            res <<= 1, res |= get(i).is_empty();
         return res;
     }
     // remove all stones in range [start, end)
@@ -180,14 +181,14 @@ template <pos_t size> struct History<size, std::enable_if_t<(size >= 16)>> {
     std::unordered_set<Board<size>, BoardHasher<size>> states;
     void add(Board<size> s) { states.insert(s); }
     void remove(Board<size> s) { states.erase(s); }
-    bool check(Board<size> s) const { return states.find(s) != states.end(); }
+    bool contains(Board<size> s) const { return states.find(s) != states.end(); }
     bool operator==(History h) const { return h.states == states; }
 };
 template <pos_t size> struct History<size, std::enable_if_t<(size < 16)>> {
     std::bitset<1ul << (size * 2)> states;
     void add(Board<size> s) { states[s.board] = true; }
     void remove(Board<size> s) { states[s.board] = false; }
-    bool check(Board<size> s) const { return states[s.board]; }
+    bool contains(Board<size> s) const { return states[s.board]; }
     bool operator==(History h) const { return h.states == states; }
 };
 
@@ -232,10 +233,10 @@ template <pos_t size> struct State {
                 game_state = GAME_OVER;
         } else {
             assert(legal_moves(move.color) & 1 << move.position);
-            assert(board.get(move.position) == EMPTY);
+            assert(board.get(move.position).is_empty());
             board.set(move.position, move.color);
             board.clear_captured(move.position);
-            assert(!history.check(board));
+            assert(!history.contains(board));
             history.add(board);
             game_state = NORMAL;
         }
@@ -265,12 +266,12 @@ template <pos_t size> struct State {
                 b.set(i, color);
                 b.clear_captured(i);
                 // check history
-                if (history.check(b)) {
+                if (history.contains(b)) {
                     legal &= ~(1 << i);
                     continue;
                 }
                 // check for suicide
-                if (b.get(i) == EMPTY)
+                if (b.get(i).is_empty())
                     legal &= ~(1 << i);
             }
         }
