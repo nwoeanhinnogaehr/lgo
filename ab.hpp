@@ -149,7 +149,8 @@ template <pos_t size, typename T> struct TranspositionTable {
     T *lookup(const State<size> &state) {
         size_t hash = hasher(state);
         Entry *e = &table[hash % SIZE];
-        if (e->valid && e->hash == hash && e->board == state.board && e->game_state == state.game_state && e->history == state.history)
+        if (e->valid && e->hash == hash && e->board == state.board &&
+            e->game_state == state.game_state && e->history == state.history)
             return &e->val;
         return nullptr;
     }
