@@ -186,39 +186,56 @@ TEST_CASE("Capture", "[state]") {
     s.play(Move(BLACK, 0));
     s.play(Move(WHITE, 1));
     REQUIRE(s.board.get(0) == EMPTY);
+    REQUIRE(s.board.is_captured(0));
     REQUIRE(s.board.get(1) == WHITE);
+    REQUIRE(!s.board.is_captured(1));
 
     s.play(Move(BLACK, 2));
     s.play(Move(WHITE, 3));
     REQUIRE(s.board.get(1) == WHITE);
+    REQUIRE(!s.board.is_captured(1));
     REQUIRE(s.board.get(2) == EMPTY);
+    REQUIRE(s.board.is_captured(2));
     REQUIRE(s.board.get(3) == WHITE);
+    REQUIRE(!s.board.is_captured(3));
 
     s.play(Move(BLACK, 4));
     s.play(Move(WHITE, 7));
     s.play(Move(BLACK, 6));
     s.play(Move(WHITE, 5));
     REQUIRE(s.board.get(3) == WHITE);
+    REQUIRE(!s.board.is_captured(3));
     REQUIRE(s.board.get(4) == EMPTY);
+    REQUIRE(s.board.is_captured(4));
     REQUIRE(s.board.get(5) == WHITE);
+    REQUIRE(!s.board.is_captured(5));
     REQUIRE(s.board.get(6) == EMPTY);
+    REQUIRE(s.board.is_captured(6));
     REQUIRE(s.board.get(7) == WHITE);
+    REQUIRE(!s.board.is_captured(7));
 
     s.play(Move(BLACK, 9));
     s.play(Move(WHITE, 8));
     s.play(Move(BLACK, 10));
     s.play(Move(WHITE, 11));
     REQUIRE(s.board.get(8) == WHITE);
+    REQUIRE(!s.board.is_captured(8));
     REQUIRE(s.board.get(9) == EMPTY);
+    REQUIRE(s.board.is_captured(9));
     REQUIRE(s.board.get(10) == EMPTY);
+    REQUIRE(s.board.is_captured(10));
     REQUIRE(s.board.get(11) == WHITE);
+    REQUIRE(!s.board.is_captured(11));
 
     s.play(Move(WHITE, 15));
     s.play(Move(WHITE, 14));
     s.play(Move(BLACK, 13));
     REQUIRE(s.board.get(13) == BLACK);
+    REQUIRE(!s.board.is_captured(13));
     REQUIRE(s.board.get(14) == EMPTY);
+    REQUIRE(s.board.is_captured(14));
     REQUIRE(s.board.get(15) == EMPTY);
+    REQUIRE(s.board.is_captured(15));
 }
 
 TEST_CASE("Indirect capture", "[state]") {
