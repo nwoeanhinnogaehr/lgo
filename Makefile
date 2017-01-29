@@ -23,4 +23,4 @@ DEPS := $(OBJ_FILES:.o=.d)
 	$(CXX) $(CXXFLAGS) -MMD -MF $(patsubst %.o,%.d,$@) -o $@ -c $<
 
 clean :
-	rm -rf *.o test ab
+	rm -rf *.o *.d test ab conjecture
