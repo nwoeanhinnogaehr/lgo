@@ -34,9 +34,9 @@ struct Cell {
     bool is_stone() const { return value == 1 || value == 2; }
     bool is_empty() const { return value == 0; }
     bool operator==(Cell o) const { return value == o.value; }
-    operator bool() const { return value; }
+    operator bool() const { return is_stone(); }
     friend std::ostream &operator<<(std::ostream &os, const Cell cell) {
-        os << ".BW"[cell.value];
+        os << ".BW*"[cell.value];
         return os;
     }
 };
@@ -69,8 +69,8 @@ struct Score {
 };
 
 template <pos_t size> struct Board {
-    pos_t board;
-    Board() : board(0) {}
+    pos_t board, captured;
+    Board() : board(0), captured(0) {}
 
     inline Cell get(pos_t pos) const {
         assert(pos < size);
@@ -80,6 +80,14 @@ template <pos_t size> struct Board {
         assert(pos < size);
         assert(cell.value <= CELL_MAX);
         board ^= (board & CELL_MAX << pos * CELL_WIDTH) ^ cell.value << pos * CELL_WIDTH;
+    }
+    inline bool is_captured(pos_t pos) const {
+        assert(pos < size);
+        return captured >> pos & 1;
+    }
+    inline void set_captured(pos_t pos, bool value) {
+        assert(pos < size);
+        captured ^= (captured & 1_pos_t << pos) ^ value << pos;
     }
     Score score() const {
         Score sc;
@@ -116,16 +124,22 @@ template <pos_t size> struct Board {
         assert(start < size);
         assert(end <= size);
         assert(start < end);
+
+        // clear board positions
         pos_t mask = (end != MAX_SIZE) * ~((1_pos_t << CELL_WIDTH * end) - 1) |
                      ((1_pos_t << CELL_WIDTH * start) - 1);
         board &= mask;
+
+        // set cleared bits to captured
+        pos_t captured_mask = ((1_pos_t << end) - 1) ^ ((1_pos_t << start) - 1);
+        captured |= captured_mask;
     }
     // clear any chains captured by a recent play at the given position
     // including suicide and return how many chains were cleared
     pos_t clear_captured(pos_t position) {
         Cell player = get(position);
         Cell opponent = player.flip();
-        pos_t captured = 0;
+        pos_t num_captured = 0;
         assert(player.is_stone());
 
         // find beginning of player chain
@@ -147,19 +161,19 @@ template <pos_t size> struct Board {
         // capture left
         if ((s >= size || get(s) == player) && i != s) {
             clear_chain(s + 1, i + 1);
-            captured++;
+            num_captured++;
         }
         // capture right
         if ((t >= size || get(t) == player) && t != j) {
             clear_chain(j, t);
-            captured++;
+            num_captured++;
         }
         // suicide
         if ((i >= size || get(i) == opponent) && (j >= size || get(j) == opponent) && j != i) {
             clear_chain(i + 1, j);
-            captured++;
+            num_captured++;
         }
-        return captured;
+        return num_captured;
     }
     bool operator==(Board o) const { return o.board == board; }
     friend std::ostream &operator<<(std::ostream &os, Board board) {
@@ -255,23 +269,25 @@ template <pos_t size> struct State {
         to_play = m.color;
         hash = hasher.update(hash, past.size(), m);
     }
+
     // retuns a bitset of all legal moves for a given color
-    pos_t legal_moves(Cell color) const {
+    pos_t legal_moves(Cell color, pos_t *captured=nullptr) const {
         assert(color.is_stone());
         pos_t legal = board.empty_set();
-
+        pos_t captured_fallback;
+        if (!captured)
+            captured = &captured_fallback;
+        *captured = 0;
         for (pos_t i = 0; i < size; i++) {
             if (legal & (1 << i)) {
                 Board<size> b = board;
                 b.set(i, color);
-                b.clear_captured(i);
-                // check history
-                if (history.contains(b)) {
-                    legal &= ~(1 << i);
-                    continue;
-                }
+                *captured |= (b.clear_captured(i) != 0) << i;
                 // check for suicide
                 if (b.get(i).is_empty())
+                    legal &= ~(1 << i);
+                // check history
+                else if (history.contains(b))
                     legal &= ~(1 << i);
             }
         }
@@ -280,16 +296,11 @@ template <pos_t size> struct State {
 
     // append legal moves of a specific type and color to a vector.
     // TODO
-    void atari_moves(Cell color, pos_t &legal, std::vector<Move> &moves) const {
+    void atari_moves(Cell color, pos_t &legal, pos_t captured, std::vector<Move> &moves) const {
         for (pos_t i = 0; i < size; i++) {
-            if (legal & (1 << i)) {
-                Board<size> b = board;
-                b.set(i, color);
-                pos_t captured = b.clear_captured(i);
-                if (captured) {
-                    moves.emplace_back(color, i);
-                    legal &= ~(1 << i);
-                }
+            if (legal & (1 << i) && captured & (1 << i)) {
+                moves.emplace_back(color, i);
+                legal &= ~(1 << i);
             }
         }
     }
@@ -327,7 +338,8 @@ template <pos_t size> struct State {
                 moves.emplace_back(color, i);
     }
     void moves(Cell color, std::vector<Move> &moves) const {
-        pos_t legal = legal_moves(color);
+        pos_t captured;
+        pos_t legal = legal_moves(color, &captured);
 
         // if moves is already initialized, prune any illegal moves and update legal
         bool has_pass = false;
@@ -354,7 +366,7 @@ template <pos_t size> struct State {
 
         // cell_2_conjecture_simple(color, legal, moves);
         cell_2_conjecture_full(color, legal, moves);
-        atari_moves(color, legal, moves);
+        atari_moves(color, legal, captured, moves);
         safe_moves(color, legal, moves);
         other_moves(color, legal, moves);
     }
