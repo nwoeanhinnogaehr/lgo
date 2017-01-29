@@ -28,6 +28,19 @@ TEST_CASE("History works", "[history]") {
     }
 }
 
+TEST_CASE("History works (size 13)", "[history]") {
+    History<13> h;
+    Board<13> s;
+    for (pos_t i = 0; i < 13; i++) {
+        for (pos_t c = 1; c < CELL_MAX; c++) {
+            s.set(i, Cell(c));
+            REQUIRE(!h.contains(s));
+            h.add(s);
+            REQUIRE(h.contains(s));
+        }
+    }
+}
+
 TEST_CASE("Passing twice results in a terminal state", "[state]") {
     State<MAX_SIZE> s;
     REQUIRE(!s.terminal());
