@@ -1,7 +1,6 @@
-#include "ab.hpp"
-#include <experimental/optional>
+#pragma once
 
-using std::experimental::optional;
+#include "ab.hpp"
 
 // helper to build a class hierarchy from a variadic list of types
 template <template <pos_t, typename, template <pos_t, typename> typename>

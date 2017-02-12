@@ -1,34 +1,36 @@
 #include "ab.hpp"
 #include <iostream>
 
-constexpr pos_t size = 6;
-
-State<size> print_path(std::vector<Move> path, State<size> root) {
-    for (Move &m : path) {
-        if (m.color == EMPTY)
-            std::cout << "init:\t";
-        else if (m.is_pass)
-            std::cout << m.color << " pass:\t";
-        else
-            std::cout << m.color << " " << m.position << ":\t";
-
-        if (m.color != EMPTY && !m.is_pass) {
-            root.play(m);
-        }
-        std::cout << root.board << std::endl;
-    }
-    return root;
-}
+constexpr pos_t size = 8;
 
 int main() {
-    IterativeDeepening<size, AlphaBeta> ab;
-    //AlphaBeta<size, PV<size>> ab;
+    IterativeDeepening<size, AlphaBeta, Metrics<size, PV<size>>> ab;
     State<size> root;
+    for (;;) {
+        int a;
+        std::string b;
+        std::cin >> a;
+        if (a == 0)
+            break;
+        std::cin >> b;
+        root.play(Move(b[0] == 'b' ? BLACK : WHITE, a - 1));
+    }
+    ab.callback = [&](auto val) {
+        std::cout << "cutoff=" << ab.impl.impl.cutoff << "\tminimax=" << val.minimax
+                  << "\tsearched=" << ab.impl.impl.num_nodes << "\n";
+        PV<size>::print_path(val.get_path(), root);
+        for (auto e : ab.impl.impl.bmtable) {
+            Board<size> board = e.first;
+            std::cout << board << ", ";
+            for (int i = -(int)size; i <= (int)size; i++) {
+                std::cout << e.second[i] << ", ";
+            }
+            std::cout << "\n";
+        }
+        std::cout << "\n";
+        ab.impl.impl.bmtable.clear();
+    };
 
     auto node = ab.search(root);
-
-    std::cout << "\nprincipal variation:\n";
-    print_path(node.get_path(), root);
-
     std::cout << "\nminimax " << node.minimax << "\n";
 }

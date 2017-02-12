@@ -3,11 +3,14 @@
 #include <bitset>
 #include <cassert>
 #include <cstdint>
+#include <experimental/optional>
 #include <iostream>
 #include <random>
 #include <stack>
 #include <unordered_set>
 #include <vector>
+
+using std::experimental::optional;
 
 // with these settings it works up to size 16
 typedef uint32_t pos_t;         // increase the size of this for larger boards
@@ -111,6 +114,10 @@ template <pos_t size> struct Board {
                 sc.white++;
         }
         return sc;
+    }
+    int minimax() const {
+        Score s = score();
+        return int(s.black) - int(s.white);
     }
     // returns a bitset of empty positions on the board.
     pos_t empty_set() const {
@@ -234,9 +241,15 @@ template <pos_t size> struct State {
     Cell to_play = BLACK;
     size_t hash = 0;
     static ZobristHasher<size> hasher;
+    struct Info {
+        pos_t legal_moves;
+        pos_t capturing_moves;
+    };
+    mutable optional<Info> info_cache[CELL_MAX];
 
     bool terminal() const { return game_state == GAME_OVER; }
     void play(Move move) {
+        std::fill(info_cache, info_cache + CELL_MAX, optional<Info>{});
         hash = hasher.update(hash, past.size(), move);
         past.emplace(game_state, board, move);
         assert(game_state != GAME_OVER);
@@ -257,6 +270,7 @@ template <pos_t size> struct State {
         to_play = move.color.flip();
     }
     void undo() {
+        std::fill(info_cache, info_cache + CELL_MAX, optional<Info>{});
         auto prev = past.top();
         past.pop();
         GameState gs = std::get<0>(prev);
@@ -270,19 +284,28 @@ template <pos_t size> struct State {
         hash = hasher.update(hash, past.size(), m);
     }
 
+    pos_t capturing_moves(Cell color) const {
+        if (!info_cache[color.value])
+            compute_info(color);
+        return info_cache[color.value]->capturing_moves;
+    }
+
     // retuns a bitset of all legal moves for a given color
-    pos_t legal_moves(Cell color, pos_t *captured=nullptr) const {
+    pos_t legal_moves(Cell color) const {
+        if (!info_cache[color.value])
+            compute_info(color);
+        return info_cache[color.value]->legal_moves;
+    }
+
+    void compute_info(Cell color) const {
         assert(color.is_stone());
         pos_t legal = board.empty_set();
-        pos_t captured_fallback;
-        if (!captured)
-            captured = &captured_fallback;
-        *captured = 0;
+        pos_t captured = 0;
         for (pos_t i = 0; i < size; i++) {
             if (legal & (1 << i)) {
                 Board<size> b = board;
                 b.set(i, color);
-                *captured |= (b.clear_captured(i) != 0) << i;
+                captured |= (b.clear_captured(i) != 0) << i;
                 // check for suicide
                 if (b.get(i).is_empty())
                     legal &= ~(1 << i);
@@ -291,85 +314,9 @@ template <pos_t size> struct State {
                     legal &= ~(1 << i);
             }
         }
-        return legal;
+        info_cache[color.value] = Info{legal, captured};
     }
 
-    // append legal moves of a specific type and color to a vector.
-    // TODO
-    void atari_moves(Cell color, pos_t &legal, pos_t captured, std::vector<Move> &moves) const {
-        for (pos_t i = 0; i < size; i++) {
-            if (legal & (1 << i) && captured & (1 << i)) {
-                moves.emplace_back(color, i);
-                legal &= ~(1 << i);
-            }
-        }
-    }
-    void cell_2_conjecture_simple(Cell color, pos_t &legal, std::vector<Move> &moves) const {
-        if (size < 4)
-            return;
-        if ((legal & 3) == 3) {
-            moves.emplace_back(color, 1);
-            legal &= ~2;
-        }
-        if ((legal & (3 << (size - 2))) == (3 << (size - 2))) {
-            moves.emplace_back(color, size - 2);
-            legal &= ~(1 << (size - 2));
-        }
-    }
-    void cell_2_conjecture_full(Cell color, pos_t &legal, std::vector<Move> &moves) const {
-        if (size < 4)
-            return;
-        for (pos_t i = 0; i < size - 2; i += 2) {
-            if ((legal & (3 << i)) == 3_pos_t << i) {
-                moves.emplace_back(color, i + 1);
-                legal &= ~(2 << i);
-            }
-            if ((legal & (3 << (size - i - 2))) == (3_pos_t << (size - i - 2))) {
-                moves.emplace_back(color, size - i - 2);
-                legal &= ~(1 << (size - i - 2));
-            }
-        }
-    }
-    void safe_moves(Cell color, pos_t &legal, std::vector<Move> &moves) const {}
-    void other_moves(Cell color, pos_t &legal, std::vector<Move> &moves) const {
-        // add all other legal moves
-        for (pos_t i = 0; i < size; i++)
-            if (legal & (1 << i))
-                moves.emplace_back(color, i);
-    }
-    void moves(Cell color, std::vector<Move> &moves) const {
-        pos_t captured;
-        pos_t legal = legal_moves(color, &captured);
-
-        // if moves is already initialized, prune any illegal moves and update legal
-        bool has_pass = false;
-        for (size_t i = 0; i < moves.size(); i++) {
-            Move m = moves[i];
-            assert(m.color == color);
-            if (m.is_pass)
-                has_pass = true;
-            else {
-                if (!(legal & (1 << m.position)))
-                    moves.erase(moves.begin() + i--);
-                else
-                    legal &= ~(1 << m.position);
-            }
-        }
-        if (!has_pass)
-            moves.emplace_back(color);
-
-        // symmetry at root
-        if (legal == ((1 << size) - 1)) {
-            legal &= ((1 << ((size - 1) / 2 + 1)) - 1); // mirror moves
-            legal &= ~1;                                // and first cell
-        }
-
-        // cell_2_conjecture_simple(color, legal, moves);
-        cell_2_conjecture_full(color, legal, moves);
-        atari_moves(color, legal, captured, moves);
-        safe_moves(color, legal, moves);
-        other_moves(color, legal, moves);
-    }
     bool operator==(State s) const {
         return s.hash == hash && s.board == board && s.game_state == game_state &&
                s.to_play == to_play && s.history == history;
