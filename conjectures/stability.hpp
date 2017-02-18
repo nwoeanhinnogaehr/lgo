@@ -32,10 +32,7 @@ template <pos_t size, typename Impl> struct Stability : Impl {
     using return_t = typename Impl::return_t;
 
     return_t make_node(Board<size> &board) {
-        auto r = return_t(board.minimax());
-        r.exact = true;
-        r.type = NodeType::PV;
-        return r;
+        return return_t(board.minimax());
     }
 
     return_t init_node(State<size> &state, minimax_t alpha, minimax_t beta, size_t depth,
