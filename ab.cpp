@@ -1,10 +1,11 @@
 #include "ab.hpp"
 #include <iostream>
+#include "conjectures.hpp"
 
-constexpr pos_t size = 8;
+constexpr pos_t size = 7;
 
 int main() {
-    IterativeDeepening<size, AlphaBeta, Metrics<size, PV<size>>> ab;
+    IterativeDeepening<size, AlphaBeta, Metrics<size, conjectures::All<size, PV<size>>>> ab;
     State<size> root;
     for (;;) {
         int a;
@@ -19,7 +20,7 @@ int main() {
         std::cout << "cutoff=" << ab.impl.impl.cutoff << "\tminimax=" << val.minimax
                   << "\tsearched=" << ab.impl.impl.num_nodes << "\n";
         PV<size>::print_path(val.get_path(), root);
-        for (auto e : ab.impl.impl.bmtable) {
+        /*for (auto e : ab.impl.impl.bmtable) {
             Board<size> board = e.first;
             std::cout << board << ", ";
             for (int i = -(int)size; i <= (int)size; i++) {
@@ -27,7 +28,7 @@ int main() {
             }
             std::cout << "\n";
         }
-        std::cout << "\n";
+        std::cout << "\n";*/
         ab.impl.impl.bmtable.clear();
     };
 

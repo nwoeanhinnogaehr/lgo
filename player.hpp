@@ -77,6 +77,7 @@ template <pos_t size> struct GoodPlayer {
                     legal &= ~(1 << m.position);
             }
         }
+
         if (!has_pass)
             moves.emplace_back(color);
 
@@ -87,7 +88,7 @@ template <pos_t size> struct GoodPlayer {
         }
 
         cell_2_conjecture_simple(color, legal, moves);
-        // cell_2_conjecture_full(color, legal, moves);
+        cell_2_conjecture_full(color, legal, moves);
         atari_moves(color, legal, moves);
         safe_moves(color, legal, moves);
         other_moves(color, legal, moves);

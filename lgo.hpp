@@ -198,14 +198,14 @@ template <pos_t size> struct BoardHasher {
 // specialize history to use a bitset (fast) if it will fit in memory,
 // or a hashmap (slow) otherwise.
 template <pos_t size, typename = void> struct History;
-template <pos_t size> struct History<size, std::enable_if_t<(size >= 13)>> {
+template <pos_t size> struct History<size, std::enable_if_t<(size >= 10)>> {
     std::unordered_set<Board<size>, BoardHasher<size>> states;
     void add(Board<size> s) { states.insert(s); }
     void remove(Board<size> s) { states.erase(s); }
     bool contains(Board<size> s) const { return states.find(s) != states.end(); }
     bool operator==(History h) const { return h.states == states; }
 };
-template <pos_t size> struct History<size, std::enable_if_t<(size < 13)>> {
+template <pos_t size> struct History<size, std::enable_if_t<(size < 10)>> {
     std::bitset<1ul << (size * 2)> states;
     void add(Board<size> s) { states[s.board] = true; }
     void remove(Board<size> s) { states[s.board] = false; }

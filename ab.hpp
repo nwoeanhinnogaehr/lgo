@@ -1,3 +1,5 @@
+#pragma once
+
 #include "lgo.hpp"
 #include "player.hpp"
 #include <algorithm>
@@ -18,16 +20,21 @@ template <pos_t size> struct Minimax {
     };
     typedef Node return_t;
     typedef int minimax_t;
+
+    // NOTE: this causes the wrong PV to be returned when the minimax equals
+    // plus or minus the board size. Use -size - 1 and size + 1  if you need
+    // correct PVs in that case.
     static constexpr minimax_t alpha_init() { return -size; }
     static constexpr minimax_t beta_init() { return size; }
+
     return_t on_enter(const State<size> &state, minimax_t alpha, minimax_t beta, size_t depth,
                       bool &terminal) const {
         if ((terminal = state.terminal())) {
             return return_t(state.board.minimax());
         }
-        return Node(state.to_play == BLACK ? -size : size);
+        return Node(state.to_play == BLACK ? alpha_init() : beta_init());
     }
-    void on_exit(const State<size> &s, minimax_t alpha, minimax_t beta, size_t depth,
+    void on_exit(const State<size> &state, minimax_t alpha, minimax_t beta, size_t depth,
                  const return_t &value) const {}
     void update(Move move, minimax_t &alpha, minimax_t &beta, return_t &parent,
                 const return_t &child) const {
@@ -57,7 +64,6 @@ template <pos_t size> struct Minimax {
 };
 
 template <pos_t size, typename Impl = Minimax<size>> struct PV : Impl {
-
     static State<size> print_path(std::vector<Move> path, State<size> root) {
         for (Move &m : path) {
             if (m.color == EMPTY)
@@ -112,8 +118,11 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
                                    size_t depth = 0) {
         bool terminal = false;
         auto parent = impl.on_enter(state, alpha, beta, depth, terminal);
-        if (terminal)
+        if (terminal) {
+            impl.on_exit(state, alpha, beta, depth, parent);
+            std::cout << state.board;
             return parent;
+        }
         if (depth >= moves.size()) {
             while (depth >= moves.size()) {
                 moves.emplace_back();
@@ -122,7 +131,9 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
         } else
             moves[depth].clear();
         impl.gen_moves(state, moves[depth]);
-        if (beta > alpha)
+        if (beta > alpha) {
+            std::cout << "(";
+            size_t i = 0;
             for (Move move : moves[depth]) {
                 state.play(move);
                 auto child = search(state, alpha, beta, depth + 1);
@@ -130,8 +141,15 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
                 impl.update(move, alpha, beta, parent, child);
                 if (beta <= alpha)
                     break;
+                if (i++ < moves[depth].size() - 1)
+                    std::cout << ",";
             }
+            std::cout << ")";
+        }
+        std::cout << state.board;
         impl.on_exit(state, alpha, beta, depth, parent);
+        if (depth == 0)
+            std::cout << ";" << std::endl;
         return parent;
     }
 };
@@ -287,6 +305,10 @@ template <pos_t size, typename Impl> struct Metrics : Impl {
     typedef typename Impl::return_t return_t;
     typedef typename Impl::minimax_t minimax_t;
 
+    return_t on_enter(State<size> &state, minimax_t &alpha, minimax_t &beta, size_t depth,
+                 bool &terminal) {
+        return Impl::on_enter(state, alpha, beta, depth, terminal);
+    }
     void on_exit(const State<size> &state, minimax_t alpha, minimax_t beta, size_t depth,
                  const return_t &value) {
         num_nodes++;

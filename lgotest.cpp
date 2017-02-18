@@ -122,6 +122,15 @@ TEST_CASE("Board scoring size 4", "[board]") {
     REQUIRE(b.score() == Score(2, 1));
 }
 
+TEST_CASE("Board scoring size 7", "[board]") {
+    Board<7> b;
+    REQUIRE(b.score() == Score(0, 0));
+    b.set(1, BLACK);
+    REQUIRE(b.score() == Score(7, 0));
+    b.set(2, WHITE);
+    REQUIRE(b.score() == Score(2, 5));
+}
+
 TEST_CASE("Legal moves size 1", "[state]") {
     State<1> s;
     // no one can play because the stone would have no liberties
