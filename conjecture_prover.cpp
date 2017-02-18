@@ -1,4 +1,4 @@
-#include "conjecture.hpp"
+#include "conjecture_prover.hpp"
 
 int main() {
     constexpr pos_t size = 6;
