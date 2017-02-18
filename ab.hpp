@@ -320,12 +320,20 @@ template <pos_t size, typename Impl> struct NewickTree : Impl {
     typedef typename Impl::return_t return_t;
     typedef typename Impl::minimax_t minimax_t;
 
-    size_t tree_depth_cutoff = 10;
+    size_t tree_depth_cutoff = 8;
     std::string output_filename = "searchtree.nhx";
 
     std::stringstream output;
     std::stack<bool> need_close;
+    size_t node_count = 0;
+    std::stack<size_t> size_before;
 
+    return_t init_node(State<size> &state, minimax_t &alpha, minimax_t &beta, size_t depth,
+                       bool &terminal) {
+        size_before.push(node_count);
+        node_count++;
+        return Impl::init_node(state, alpha, beta, depth, terminal);
+    }
     void on_enter(State<size> &state, minimax_t &alpha, minimax_t &beta, size_t depth) {
         if (depth < tree_depth_cutoff && beta > alpha) {
             output << "(";
@@ -341,6 +349,8 @@ template <pos_t size, typename Impl> struct NewickTree : Impl {
     }
     void on_exit(const State<size> &state, minimax_t alpha, minimax_t beta, size_t depth,
                  const return_t &value, bool terminal) {
+        size_t subtree_size = node_count - size_before.top();
+        size_before.pop();
         if (!terminal) {
             if (need_close.top())
                 output << ")";
@@ -362,6 +372,7 @@ template <pos_t size, typename Impl> struct NewickTree : Impl {
             output << ":exact=" << value.exact;
             output << ":alpha=" << alpha;
             output << ":beta=" << beta;
+            output << ":subtree_size=" << subtree_size;
             output << "]";
         }
 
@@ -373,6 +384,7 @@ template <pos_t size, typename Impl> struct NewickTree : Impl {
             outfile.close();
             output.str(std::string());
             output.clear();
+            node_count = 0;
         }
         Impl::on_exit(state, alpha, beta, depth, value, terminal);
     }
