@@ -43,21 +43,19 @@ template <pos_t size> struct Minimax {
                     size_t index) const {}
     void update(Move move, minimax_t &alpha, minimax_t &beta, return_t &parent,
                 const return_t &child) const {
+        parent.exact &= child.exact;
         if (child.minimax > alpha && child.minimax < beta) {
-            parent.exact &= child.exact;
             parent.type = NodeType::PV;
         }
         if (move.color == BLACK && child.minimax >= parent.minimax) {
             parent.minimax = std::max(parent.minimax, child.minimax);
             alpha = std::max(alpha, parent.minimax);
-            parent.exact &= child.exact;
             if (parent.type != NodeType::PV)
                 parent.type = NodeType::MIN;
         }
         if (move.color == WHITE && child.minimax <= parent.minimax) {
             parent.minimax = std::min(parent.minimax, child.minimax);
             beta = std::min(beta, parent.minimax);
-            parent.exact &= child.exact;
             if (parent.type != NodeType::PV)
                 parent.type = NodeType::MAX;
         }
