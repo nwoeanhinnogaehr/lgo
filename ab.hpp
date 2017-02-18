@@ -321,7 +321,7 @@ template <pos_t size, typename Impl> struct NewickTree : Impl {
     typedef typename Impl::minimax_t minimax_t;
 
     size_t tree_depth_cutoff = 10;
-    std::string output_filename = "searchtree.nh";
+    std::string output_filename = "searchtree.nhx";
 
     std::stringstream output;
     std::stack<bool> need_close;
