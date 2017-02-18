@@ -322,7 +322,7 @@ template <pos_t size, typename Impl> struct NewickTree : Impl {
     typedef typename Impl::return_t return_t;
     typedef typename Impl::minimax_t minimax_t;
 
-    size_t tree_depth_cutoff = 5;
+    size_t tree_depth_cutoff = 10;
     std::string output_filename = "searchtree.nh";
 
     std::stringstream output;
@@ -347,13 +347,28 @@ template <pos_t size, typename Impl> struct NewickTree : Impl {
             if (need_close.top())
                 output << ")";
             need_close.pop();
-            if (depth <= tree_depth_cutoff)
-                output << state.board;
-            if (depth == 0)
-                output << ";" << std::endl;
-        } else if (depth <= tree_depth_cutoff)
+        }
+        if (depth <= tree_depth_cutoff) {
             output << state.board;
+            output << "[&&NHX";
+            output << ":minimax=" << value.minimax;
+            output << ":type=";
+            if (value.type == NodeType::PV)
+                output << "PV";
+            else if (value.type == NodeType::MIN)
+                output << "Min";
+            else if (value.type == NodeType::MAX)
+                output << "Max";
+            else if (value.type == NodeType::NIL)
+                output << "NIL";
+            output << ":exact=" << value.exact;
+            output << ":alpha=" << alpha;
+            output << ":beta=" << beta;
+            output << "]";
+        }
+
         if (depth == 0) {
+            output << ";" << std::endl;
             std::ofstream outfile;
             outfile.open(output_filename, std::ios::out | std::ios::trunc);
             outfile << output.str();
