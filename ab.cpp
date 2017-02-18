@@ -5,7 +5,7 @@
 constexpr pos_t size = 7;
 
 int main() {
-    IterativeDeepening<size, AlphaBeta, Metrics<size, conjectures::All<size, PV<size>>>> ab;
+    IterativeDeepening<size, AlphaBeta, NewickTree<size, Metrics<size, conjectures::All<size, PV<size>>>>> ab;
     State<size> root;
     for (;;) {
         int a;

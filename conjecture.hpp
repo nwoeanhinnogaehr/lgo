@@ -24,23 +24,23 @@ struct ConjectureProverImplWrapper : Impl {
     Conjecture<size, Impl> conj;
     AlphaBeta<size, Conjecture<size, Impl>> conj_search;
     std::stack<optional<return_t>> conjected;
-    return_t on_enter(State<size> &state, minimax_t &alpha, minimax_t &beta, size_t depth,
+    return_t init_node(State<size> &state, minimax_t &alpha, minimax_t &beta, size_t depth,
                       bool &terminal) {
         if (conj.diverges(state))
             conjected.emplace(conj_search.search(state, alpha, beta, depth));
         else
             conjected.emplace();
-        return Impl::on_enter(state, alpha, beta, depth, terminal);
+        return Impl::init_node(state, alpha, beta, depth, terminal);
     }
     void on_exit(const State<size> &state, minimax_t alpha, minimax_t beta, size_t depth,
-                 const return_t &value) {
+                 const return_t &value, bool terminal) {
         optional<return_t> expected = conjected.top();
         conjected.pop();
         if (expected && !(*expected == value)) {
             std::cout << "At board " << state.board << " with player " << state.to_play
                       << " at depth " << depth << std::endl;
         }
-        Impl::on_exit(state, alpha, beta, depth, value);
+        Impl::on_exit(state, alpha, beta, depth, value, terminal);
     }
 };
 template <pos_t size, typename Impl, template <pos_t, typename> typename Search,
@@ -57,13 +57,13 @@ struct PrunedSearchImplWrapper : Impl {
     typedef typename Impl::minimax_t minimax_t;
     typedef typename Impl::return_t return_t;
     Conjecture<size, Impl> conj;
-    return_t on_enter(State<size> &state, minimax_t &alpha, minimax_t &beta, size_t depth,
+    return_t init_node(State<size> &state, minimax_t &alpha, minimax_t &beta, size_t depth,
                       bool &terminal) {
         if (optional<return_t> conjected = conj.apply(state, alpha, beta)) {
             terminal = true;
             return *conjected;
         }
-        return Impl::on_enter(state, alpha, beta, depth, terminal);
+        return Impl::init_node(state, alpha, beta, depth, terminal);
     }
 };
 template <pos_t size, typename Impl, template <pos_t, typename> typename Search,

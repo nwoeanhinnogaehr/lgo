@@ -9,7 +9,7 @@ namespace conjectures {
 template <pos_t size, typename Impl> struct Full : Impl {
     using minimax_t = typename Impl::minimax_t;
     using return_t = typename Impl::return_t;
-    return_t on_enter(State<size> &state, minimax_t alpha, minimax_t beta, size_t depth,
+    return_t init_node(State<size> &state, minimax_t alpha, minimax_t beta, size_t depth,
                       bool &terminal) {
         int minimax = state.board.minimax();
         if ((minimax == int(size) || minimax == -int(size)) &&
@@ -17,7 +17,7 @@ template <pos_t size, typename Impl> struct Full : Impl {
             terminal = true;
             return return_t(minimax);
         }
-        return Impl::on_enter(state, alpha, beta, depth, terminal);
+        return Impl::init_node(state, alpha, beta, depth, terminal);
     }
 };
 };

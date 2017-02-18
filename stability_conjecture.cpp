@@ -1,7 +1,7 @@
 #include "conjecture.hpp"
 #include <unordered_set>
 
-constexpr pos_t size = 6;
+constexpr pos_t size = 7;
 
 void test(State<size> state) {
     static IterativeDeepeningAlphaBeta<size, Minimax<size>> search;
@@ -48,7 +48,7 @@ template <pos_t size, typename Impl> struct StabilityConjecture : Impl {
         return stable_boards.find(state.board) != stable_boards.end() && state.board.captured == 0;
     }
 
-    return_t on_enter(State<size> &state, minimax_t &alpha, minimax_t &beta, size_t depth,
+    return_t init_node(State<size> &state, minimax_t &alpha, minimax_t &beta, size_t depth,
                       bool &terminal) {
         auto it = stable_boards.find(state.board);
         if (it != stable_boards.end() && state.board.captured == 0) {
@@ -58,7 +58,7 @@ template <pos_t size, typename Impl> struct StabilityConjecture : Impl {
             r.type = NodeType::PV;
             return r;
         }
-        return Impl::on_enter(state, alpha, beta, depth, terminal);
+        return Impl::init_node(state, alpha, beta, depth, terminal);
     }
 };
 
@@ -70,6 +70,15 @@ int main() {
     std::cout << "total stable: " << stable_states.size() << std::endl;
     IterativeDeepeningAlphaBeta<size, Metrics<size, StabilityConjecture<size, PV<size>>>> search;
     State<size> root;
+    for (;;) {
+        int a;
+        std::string b;
+        std::cin >> a;
+        if (a == 0)
+            break;
+        std::cin >> b;
+        root.play(Move(b[0] == 'b' ? BLACK : WHITE, a - 1));
+    }
     search.callback = [&](auto val) {
         PV<size>::print_path(val.get_path(), root);
         std::cout << "cutoff=" << search.impl.impl.cutoff << "\tminimax=" << val.minimax

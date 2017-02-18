@@ -38,7 +38,7 @@ template <pos_t size, typename Impl> struct Stability : Impl {
         return r;
     }
 
-    return_t on_enter(State<size> &state, minimax_t alpha, minimax_t beta, size_t depth,
+    return_t init_node(State<size> &state, minimax_t alpha, minimax_t beta, size_t depth,
                       bool &terminal) {
         static auto stable_boards = compute_stable_boards();
         if (state.board.captured == 0) {
@@ -48,7 +48,7 @@ template <pos_t size, typename Impl> struct Stability : Impl {
                 return make_node(state.board);
             }
         }
-        return Impl::on_enter(state, alpha, beta, depth, terminal);
+        return Impl::init_node(state, alpha, beta, depth, terminal);
     }
 };
 };

@@ -4,8 +4,10 @@
 #include "player.hpp"
 #include <algorithm>
 #include <climits>
+#include <fstream>
 #include <functional>
 #include <memory>
+#include <sstream>
 #include <unordered_map>
 
 enum class NodeType { NIL, PV, MIN, MAX };
@@ -27,15 +29,18 @@ template <pos_t size> struct Minimax {
     static constexpr minimax_t alpha_init() { return -size; }
     static constexpr minimax_t beta_init() { return size; }
 
-    return_t on_enter(const State<size> &state, minimax_t alpha, minimax_t beta, size_t depth,
-                      bool &terminal) const {
+    return_t init_node(const State<size> &state, minimax_t alpha, minimax_t beta, size_t depth,
+                       bool &terminal) const {
         if ((terminal = state.terminal())) {
             return return_t(state.board.minimax());
         }
         return Node(state.to_play == BLACK ? alpha_init() : beta_init());
     }
+    void on_enter(const State<size> &state, minimax_t alpha, minimax_t beta, size_t depth) const {}
     void on_exit(const State<size> &state, minimax_t alpha, minimax_t beta, size_t depth,
-                 const return_t &value) const {}
+                 const return_t &value, bool terminal) const {}
+    void pre_update(Move move, minimax_t &alpha, minimax_t &beta, return_t &parent, size_t depth,
+                    size_t index) const {}
     void update(Move move, minimax_t &alpha, minimax_t &beta, return_t &parent,
                 const return_t &child) const {
         if (child.minimax > alpha && child.minimax < beta) {
@@ -117,12 +122,12 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
                                    typename Impl::minimax_t beta = Impl::beta_init(),
                                    size_t depth = 0) {
         bool terminal = false;
-        auto parent = impl.on_enter(state, alpha, beta, depth, terminal);
+        auto parent = impl.init_node(state, alpha, beta, depth, terminal);
         if (terminal) {
-            impl.on_exit(state, alpha, beta, depth, parent);
-            std::cout << state.board;
+            impl.on_exit(state, alpha, beta, depth, parent, true);
             return parent;
         }
+        impl.on_enter(state, alpha, beta, depth);
         if (depth >= moves.size()) {
             while (depth >= moves.size()) {
                 moves.emplace_back();
@@ -132,24 +137,19 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
             moves[depth].clear();
         impl.gen_moves(state, moves[depth]);
         if (beta > alpha) {
-            std::cout << "(";
-            size_t i = 0;
+            size_t index = 0;
             for (Move move : moves[depth]) {
+                impl.pre_update(move, alpha, beta, parent, depth, index);
                 state.play(move);
                 auto child = search(state, alpha, beta, depth + 1);
                 state.undo();
                 impl.update(move, alpha, beta, parent, child);
                 if (beta <= alpha)
                     break;
-                if (i++ < moves[depth].size() - 1)
-                    std::cout << ",";
+                index++;
             }
-            std::cout << ")";
         }
-        std::cout << state.board;
-        impl.on_exit(state, alpha, beta, depth, parent);
-        if (depth == 0)
-            std::cout << ";" << std::endl;
+        impl.on_exit(state, alpha, beta, depth, parent, false);
         return parent;
     }
 };
@@ -224,9 +224,9 @@ struct IterativeDeepening {
         static constexpr minimax_t alpha_init() { return -size; }
         static constexpr minimax_t beta_init() { return size; }
 
-        return_t on_enter(State<size> &state, minimax_t &alpha, minimax_t &beta, size_t depth,
-                          bool &terminal) {
-            return_t implv = return_t(Impl::on_enter(state, alpha, beta, depth, terminal));
+        return_t init_node(State<size> &state, minimax_t &alpha, minimax_t &beta, size_t depth,
+                           bool &terminal) {
+            return_t implv = return_t(Impl::init_node(state, alpha, beta, depth, terminal));
             if (terminal)
                 return implv;
 
@@ -255,10 +255,10 @@ struct IterativeDeepening {
             return true_score(state.to_play == BLACK ? alpha_init() : beta_init());
         }
         void on_exit(const State<size> &state, minimax_t &alpha, minimax_t &beta, size_t depth,
-                     const return_t &value) {
+                     const return_t &value, bool terminal) {
             if (value.exact)
                 tt.insert(state, TTEntry(value));
-            Impl::on_exit(state, alpha, beta, depth, value);
+            Impl::on_exit(state, alpha, beta, depth, value, terminal);
         }
         void gen_moves(const State<size> &state, std::vector<Move> &moves) {
             // init with best move from TT entry
@@ -305,15 +305,62 @@ template <pos_t size, typename Impl> struct Metrics : Impl {
     typedef typename Impl::return_t return_t;
     typedef typename Impl::minimax_t minimax_t;
 
-    return_t on_enter(State<size> &state, minimax_t &alpha, minimax_t &beta, size_t depth,
-                 bool &terminal) {
-        return Impl::on_enter(state, alpha, beta, depth, terminal);
+    return_t init_node(State<size> &state, minimax_t &alpha, minimax_t &beta, size_t depth,
+                       bool &terminal) {
+        return Impl::init_node(state, alpha, beta, depth, terminal);
     }
     void on_exit(const State<size> &state, minimax_t alpha, minimax_t beta, size_t depth,
-                 const return_t &value) {
+                 const return_t &value, bool terminal) {
         num_nodes++;
         if (value.type == NodeType::PV && value.exact)
             bmtable[state.board][value.minimax]++;
-        Impl::on_exit(state, alpha, beta, depth, value);
+        Impl::on_exit(state, alpha, beta, depth, value, terminal);
+    }
+};
+
+template <pos_t size, typename Impl> struct NewickTree : Impl {
+    typedef typename Impl::return_t return_t;
+    typedef typename Impl::minimax_t minimax_t;
+
+    size_t tree_depth_cutoff = 5;
+    std::string output_filename = "searchtree.nh";
+
+    std::stringstream output;
+    std::stack<bool> need_close;
+
+    void on_enter(State<size> &state, minimax_t &alpha, minimax_t &beta, size_t depth) {
+        if (depth < tree_depth_cutoff && beta > alpha) {
+            output << "(";
+            need_close.push(true);
+        } else
+            need_close.push(false);
+        Impl::on_enter(state, alpha, beta, depth);
+    }
+    void pre_update(Move move, minimax_t &alpha, minimax_t &beta, return_t &parent, size_t depth,
+                    size_t index) {
+        if (depth < tree_depth_cutoff && index != 0)
+            output << ",";
+    }
+    void on_exit(const State<size> &state, minimax_t alpha, minimax_t beta, size_t depth,
+                 const return_t &value, bool terminal) {
+        if (!terminal) {
+            if (need_close.top())
+                output << ")";
+            need_close.pop();
+            if (depth <= tree_depth_cutoff)
+                output << state.board;
+            if (depth == 0)
+                output << ";" << std::endl;
+        } else if (depth <= tree_depth_cutoff)
+            output << state.board;
+        if (depth == 0) {
+            std::ofstream outfile;
+            outfile.open(output_filename, std::ios::out | std::ios::trunc);
+            outfile << output.str();
+            outfile.close();
+            output.str(std::string());
+            output.clear();
+        }
+        Impl::on_exit(state, alpha, beta, depth, value, terminal);
     }
 };
