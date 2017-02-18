@@ -281,14 +281,26 @@ struct IterativeDeepening {
     typename ImplWrapper::return_t
     search(State<size> &state, typename ImplWrapper::minimax_t alpha = Impl::alpha_init(),
            typename ImplWrapper::minimax_t beta = Impl::beta_init(), size_t depth = 0) {
-        impl.impl.cutoff = 0;
+        impl.impl.cutoff = 1;
+        int last_minimax = 0;
         while (true) {
+            auto aspiration = impl.search(state, last_minimax - 1, last_minimax + 1, depth);
+            if (aspiration.type == NodeType::PV) {
+                if (callback)
+                    callback(aspiration);
+                if (aspiration.exact)
+                    return aspiration;
+                last_minimax = aspiration.minimax;
+                impl.impl.cutoff += 5;
+                continue;
+            }
             auto val = impl.search(state, alpha, beta, depth);
             if (callback)
                 callback(val);
             if (val.exact)
                 return val;
-            impl.impl.cutoff += 1;
+            last_minimax = val.minimax;
+            impl.impl.cutoff += 10;
         }
     }
 };
