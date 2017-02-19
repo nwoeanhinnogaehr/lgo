@@ -339,9 +339,13 @@ template <pos_t size, typename Impl> struct NewickTree : Impl {
     std::stack<bool> need_close;
     size_t node_count = 0;
     std::stack<size_t> size_before;
+    std::stack<size_t> max_depth;
 
     return_t init_node(State<size> &state, minimax_t &alpha, minimax_t &beta, size_t depth,
                        bool &terminal) {
+        if (depth == 0)
+            max_depth.push(0);
+        max_depth.push(depth);
         size_before.push(node_count);
         node_count++;
         return Impl::init_node(state, alpha, beta, depth, terminal);
@@ -361,6 +365,7 @@ template <pos_t size, typename Impl> struct NewickTree : Impl {
     }
     void on_exit(const State<size> &state, minimax_t alpha, minimax_t beta, size_t depth,
                  const return_t &value, bool terminal) {
+        size_t last_depth = max_depth.top();
         size_t subtree_size = node_count - size_before.top();
         size_before.pop();
         if (!terminal) {
@@ -385,8 +390,12 @@ template <pos_t size, typename Impl> struct NewickTree : Impl {
             output << ":alpha=" << alpha;
             output << ":beta=" << beta;
             output << ":subtree_size=" << subtree_size;
+            output << ":max_depth=" << last_depth;
             output << "]";
         }
+        max_depth.pop();
+        size_t &parent_depth = max_depth.top();
+        parent_depth = std::max(parent_depth, last_depth);
 
         if (depth == 0) {
             output << ";" << std::endl;
