@@ -354,6 +354,7 @@ struct IterativeDeepening {
                       << aspiration.type << std::endl;
             if (callback)
                 callback(aspiration);
+            std::cout << std::endl;
             if (aspiration.exact && aspiration.type == NodeType::PV)
                 return aspiration;
             if (aspiration.exact && aspiration.type == NodeType::MIN)
@@ -366,13 +367,13 @@ struct IterativeDeepening {
             if (aspiration.type == NodeType::PV)
                 continue;
             if (alpha < beta - 2) {
-                std::cout << std::endl;
                 std::cout << "Doing full search in [" << alpha << ", " << beta << "]" << std::endl;
                 auto val = impl.search(state, alpha, beta, depth);
                 std::cout << "Result type: " << (val.exact ? "exact " : "inexact ") << val.type
                           << std::endl;
                 if (callback)
                     callback(val);
+                std::cout << std::endl;
                 if (val.exact && val.type == NodeType::PV)
                     return val;
                 if (val.exact && val.type == NodeType::MIN)
@@ -383,7 +384,6 @@ struct IterativeDeepening {
                 last_minimax = std::max(alpha, std::min(beta, last_minimax));
                 impl.impl.cutoff += 1;
             }
-            std::cout << std::endl;
         }
     }
 };
