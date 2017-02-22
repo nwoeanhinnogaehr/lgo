@@ -1,20 +1,35 @@
 #include "ab.hpp"
-#include <iostream>
+#include "cmdparser.hpp"
 #include "conjectures.hpp"
+#include <iostream>
 
 constexpr pos_t size = 7;
 
-int main() {
-    IterativeDeepening<size, AlphaBeta, NewickTree<size, Metrics<size, conjectures::All<size, PV<size>>>>> ab;
+void configure_parser(cli::Parser &parser) {
+    parser.set_optional<int>("a", "alpha", -size, "Initial alpha value");
+    parser.set_optional<int>("b", "beta", size, "Initial beta value");
+    parser.set_optional<int>("g", "guess", -100000,
+                             "Minimax guess. Overrides alpha and beta options.");
+    parser.set_optional<std::vector<std::string>>(
+        "", "state", std::vector<std::string>(),
+        "Moves in the form {position}{color}, where color is b or w");
+}
+
+int main(int argc, char **argv) {
+    cli::Parser parser(argc, argv);
+    configure_parser(parser);
+    parser.run_and_exit_if_error();
+
+    using Impl = NewickTree<size, Metrics<size, conjectures::All<size, PV<size>>>>;
+    IterativeDeepening<size, AlphaBeta, Impl> ab;
     State<size> root;
-    for (;;) {
-        int a;
-        std::string b;
-        std::cin >> a;
-        if (a == 0)
-            break;
-        std::cin >> b;
-        root.play(Move(b[0] == 'b' ? BLACK : WHITE, a - 1));
+
+    std::vector<std::string> state = parser.get<std::vector<std::string>>("");
+    for (auto move : state) {
+        std::cout << move << std::endl;
+        char player = tolower(move[0]);
+        int pos = std::stoi(move.substr(1));
+        root.play(Move(player == 'b' ? BLACK : WHITE, pos - 1));
     }
     ab.callback = [&](auto val) {
         std::cout << "cutoff=" << ab.impl.impl.cutoff << "\tminimax=" << val.minimax
@@ -32,6 +47,16 @@ int main() {
         ab.impl.impl.bmtable.clear();
     };
 
-    auto node = ab.search(root);
+    int alpha = parser.get<int>("a"), beta = parser.get<int>("b");
+    if (alpha > beta) {
+        std::cout << "invalid bounds!" << std::endl;
+        return 0;
+    }
+    int guess = parser.get<int>("g");
+    if (guess != -100000) {
+        alpha = guess - 1;
+        beta = guess + 1;
+    }
+    auto node = ab.search(root, alpha, beta);
     std::cout << "\nminimax " << node.minimax << "\n";
 }
