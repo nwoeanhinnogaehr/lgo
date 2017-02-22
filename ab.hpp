@@ -127,13 +127,14 @@ size_t murmur(size_t key) {
 template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
     std::vector<std::vector<Move>> moves;
     Impl impl;
-    static constexpr size_t ORDER_TABLE_SIZE = 1 << 16;
+    static constexpr size_t ORDER_TABLE_SIZE = 1 << 22;
     struct compare {
         bool operator()(std::pair<size_t, Move> a, std::pair<size_t, Move> b) {
             return a.first < b.first;
         }
     };
-    std::array<std::set<std::pair<size_t, Move>, compare>, ORDER_TABLE_SIZE> order_table;
+    std::vector<std::set<std::pair<size_t, Move>, compare>> order_table =
+        std::vector<std::set<std::pair<size_t, Move>, compare>>(ORDER_TABLE_SIZE);
     size_t node_count = 0;
 
     typename Impl::return_t search(State<size> &state,
@@ -163,7 +164,7 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
         } else
             moves[depth].clear();
 
-        auto &order = order_table[(state.board.board ^ murmur(depth)) % ORDER_TABLE_SIZE];
+        auto &order = order_table[(murmur(state.board.board) ^ murmur(depth)) % ORDER_TABLE_SIZE];
         for (auto &p : order) {
             moves[depth].emplace_back(p.second);
         }
@@ -183,7 +184,7 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
                 if (child.exact) {
                     impl.update(move, alpha, beta, parent, child);
                     auto &order =
-                        order_table[(state.board.board ^ murmur(depth)) % ORDER_TABLE_SIZE];
+                        order_table[(murmur(state.board.board) ^ murmur(depth)) % ORDER_TABLE_SIZE];
                     order.emplace(subtree_size, move);
                 }
                 if (beta <= alpha && child.exact) {
