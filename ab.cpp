@@ -26,7 +26,6 @@ int main(int argc, char **argv) {
 
     std::vector<std::string> state = parser.get<std::vector<std::string>>("");
     for (auto move : state) {
-        std::cout << move << std::endl;
         char player = tolower(move[0]);
         int pos = std::stoi(move.substr(1));
         root.play(Move(player == 'b' ? BLACK : WHITE, pos - 1));
