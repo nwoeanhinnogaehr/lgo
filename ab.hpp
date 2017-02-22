@@ -115,6 +115,15 @@ template <pos_t size, typename Impl = Minimax<size>> struct PV : Impl {
     }
 };
 
+size_t murmur(size_t key) {
+    key ^= key >> 33;
+    key *= 0xff51afd7ed558ccd;
+    key ^= key >> 33;
+    key *= 0xc4ceb9fe1a85ec53;
+    key ^= key >> 33;
+    return key;
+}
+
 template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
     std::vector<std::vector<Move>> moves;
     Impl impl;
@@ -154,13 +163,11 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
         } else
             moves[depth].clear();
 
-        {
-            auto &order = order_table[state.board.board % ORDER_TABLE_SIZE];
-            for (auto &p : order) {
-                moves[depth].emplace_back(p.second);
-            }
-            order.clear();
+        auto &order = order_table[(state.board.board ^ murmur(depth)) % ORDER_TABLE_SIZE];
+        for (auto &p : order) {
+            moves[depth].emplace_back(p.second);
         }
+        order.clear();
         impl.gen_moves(state, moves[depth]);
         bool all_exact = true;
         if (beta > alpha) {
@@ -175,7 +182,8 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
                 state.undo();
                 if (child.exact) {
                     impl.update(move, alpha, beta, parent, child);
-                    auto &order = order_table[state.board.board % ORDER_TABLE_SIZE];
+                    auto &order =
+                        order_table[(state.board.board ^ murmur(depth)) % ORDER_TABLE_SIZE];
                     order.emplace(subtree_size, move);
                 }
                 if (beta <= alpha && child.exact) {
@@ -259,7 +267,6 @@ struct IterativeDeepening {
         v.exact = false;
         return v;
     }
-
     struct ImplWrapper : public Impl {
         typedef Node return_t;
         typedef typename Impl::minimax_t minimax_t;
