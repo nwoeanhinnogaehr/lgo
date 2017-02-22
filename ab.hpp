@@ -15,6 +15,11 @@
 #include <unordered_map>
 
 enum class NodeType { NIL, PV, MIN, MAX };
+std::ostream &operator<<(std::ostream &os, const NodeType type) {
+    const char *names[] = {"NIL", "PV", "Min", "Max"};
+    os << names[size_t(type)];
+    return os;
+}
 
 template <pos_t size> struct Minimax {
     struct Node {
@@ -340,26 +345,45 @@ struct IterativeDeepening {
            typename ImplWrapper::minimax_t beta = Impl::beta_init(), size_t depth = 0) {
         impl.impl.cutoff = 1;
         typename ImplWrapper::minimax_t last_minimax = 0;
+        last_minimax = std::max(alpha + 1, std::min(beta - 1, last_minimax));
         std::srand(unsigned(std::time(0)));
         while (true) {
+            std::cout << "Doing aspiration search around " << last_minimax << std::endl;
             auto aspiration = impl.search(state, last_minimax - 1, last_minimax + 1, depth);
-            std::cout << int(aspiration.type) << std::endl;
+            std::cout << "Result type: " << (aspiration.exact ? "exact " : "inexact ")
+                      << aspiration.type << std::endl;
             if (callback)
                 callback(aspiration);
             if (aspiration.exact && aspiration.type == NodeType::PV)
                 return aspiration;
+            if (aspiration.exact && aspiration.type == NodeType::MIN)
+                beta = std::min(beta, aspiration.minimax);
+            if (aspiration.exact && aspiration.type == NodeType::MAX)
+                alpha = std::max(alpha, aspiration.minimax);
             last_minimax = aspiration.minimax;
+            last_minimax = std::max(alpha, std::min(beta, last_minimax));
             impl.impl.cutoff += 1;
             if (aspiration.type == NodeType::PV)
                 continue;
-            auto val = impl.search(state, alpha, beta, depth);
-            if (callback)
-                callback(val);
-            std::cout << int(val.type) << std::endl;
-            if (val.exact && val.type == NodeType::PV)
-                return val;
-            last_minimax = val.minimax;
-            impl.impl.cutoff += 1;
+            if (alpha < beta - 2) {
+                std::cout << std::endl;
+                std::cout << "Doing full search in [" << alpha << ", " << beta << "]" << std::endl;
+                auto val = impl.search(state, alpha, beta, depth);
+                std::cout << "Result type: " << (val.exact ? "exact " : "inexact ") << val.type
+                          << std::endl;
+                if (callback)
+                    callback(val);
+                if (val.exact && val.type == NodeType::PV)
+                    return val;
+                if (val.exact && val.type == NodeType::MIN)
+                    beta = std::min(beta, val.minimax);
+                if (val.exact && val.type == NodeType::MAX)
+                    alpha = std::max(alpha, val.minimax);
+                last_minimax = val.minimax;
+                last_minimax = std::max(alpha, std::min(beta, last_minimax));
+                impl.impl.cutoff += 1;
+            }
+            std::cout << std::endl;
         }
     }
 };
@@ -443,15 +467,7 @@ template <pos_t size, typename Impl> struct NewickTree : Impl {
             output << state.board;
             output << "[&&NHX";
             output << ":minimax=" << value.minimax;
-            output << ":type=";
-            if (value.type == NodeType::PV)
-                output << "PV";
-            else if (value.type == NodeType::MIN)
-                output << "Min";
-            else if (value.type == NodeType::MAX)
-                output << "Max";
-            else if (value.type == NodeType::NIL)
-                output << "NIL";
+            output << ":type=" << value.type;
             output << ":exact=" << value.exact;
             output << ":alpha=" << prev_alpha << "->" << alpha;
             output << ":beta=" << prev_beta << "->" << beta;
