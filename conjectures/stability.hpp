@@ -42,7 +42,9 @@ template <pos_t size, typename Impl> struct Stability : Impl {
             auto it = stable_boards.find(state.board);
             if (it != stable_boards.end()) {
                 terminal = true;
-                return make_node(state.board);
+                return_t node = make_node(state.board);
+                //node.type = NodeType::PV;
+                return node;
             }
         }
         return Impl::init_node(state, alpha, beta, depth, terminal);

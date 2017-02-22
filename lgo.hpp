@@ -37,6 +37,7 @@ struct Cell {
     bool is_stone() const { return value == 1 || value == 2; }
     bool is_empty() const { return value == 0; }
     bool operator==(Cell o) const { return value == o.value; }
+    bool operator!=(Cell o) const { return value != o.value; }
     operator bool() const { return is_stone(); }
     friend std::ostream &operator<<(std::ostream &os, const Cell cell) {
         os << ".BW*"[cell.value];
@@ -69,6 +70,7 @@ struct Score {
         return -1;
     }
     bool operator==(Score o) const { return o.black == black && o.white == white; }
+    bool operator!=(Score o) const { return o.black != black || o.white != white; }
 };
 
 template <pos_t size> struct Board {
@@ -183,6 +185,7 @@ template <pos_t size> struct Board {
         return num_captured;
     }
     bool operator==(Board o) const { return o.board == board; }
+    bool operator!=(Board o) const { return o.board != board; }
     friend std::ostream &operator<<(std::ostream &os, Board board) {
         for (pos_t i = 0; i < size; i++)
             os << board.get(i);
@@ -204,6 +207,7 @@ template <pos_t size> struct History<size, std::enable_if_t<(size >= 10)>> {
     void remove(Board<size> s) { states.erase(s); }
     bool contains(Board<size> s) const { return states.find(s) != states.end(); }
     bool operator==(History h) const { return h.states == states; }
+    bool operator!=(History h) const { return h.states != states; }
 };
 template <pos_t size> struct History<size, std::enable_if_t<(size < 10)>> {
     std::bitset<1ul << (size * 2)> states;
@@ -211,6 +215,7 @@ template <pos_t size> struct History<size, std::enable_if_t<(size < 10)>> {
     void remove(Board<size> s) { states[s.board] = false; }
     bool contains(Board<size> s) const { return states[s.board]; }
     bool operator==(History h) const { return h.states == states; }
+    bool operator!=(History h) const { return h.states != states; }
 };
 
 // Zobrist hashing for states.
@@ -320,6 +325,9 @@ template <pos_t size> struct State {
     bool operator==(State s) const {
         return s.hash == hash && s.board == board && s.game_state == game_state &&
                s.to_play == to_play && s.history == history;
+    }
+    bool operator!=(State s) const {
+        return !(s == *this);
     }
 };
 template <pos_t size> ZobristHasher<size> State<size>::hasher;

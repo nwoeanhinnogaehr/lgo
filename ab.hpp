@@ -3,10 +3,14 @@
 #include "lgo.hpp"
 #include "player.hpp"
 #include <algorithm>
+#include <array>
 #include <climits>
+#include <cstdlib>
+#include <ctime>
 #include <fstream>
 #include <functional>
 #include <memory>
+#include <set>
 #include <sstream>
 #include <unordered_map>
 
@@ -23,9 +27,6 @@ template <pos_t size> struct Minimax {
     typedef Node return_t;
     typedef int minimax_t;
 
-    // NOTE: this causes the wrong PV to be returned when the minimax equals
-    // plus or minus the board size. Use -size - 1 and size + 1  if you need
-    // correct PVs in that case.
     static constexpr minimax_t alpha_init() { return -size; }
     static constexpr minimax_t beta_init() { return size; }
 
@@ -34,7 +35,7 @@ template <pos_t size> struct Minimax {
         if ((terminal = state.terminal())) {
             return return_t(state.board.minimax());
         }
-        return Node(state.to_play == BLACK ? alpha_init() : beta_init());
+        return Node(state.to_play == BLACK ? alpha : beta);
     }
     void on_enter(const State<size> &state, minimax_t alpha, minimax_t beta, size_t depth) const {}
     void on_exit(const State<size> &state, minimax_t alpha, minimax_t beta, size_t depth,
@@ -43,21 +44,21 @@ template <pos_t size> struct Minimax {
                     size_t index) const {}
     void update(Move move, minimax_t &alpha, minimax_t &beta, return_t &parent,
                 const return_t &child) const {
-        parent.exact &= child.exact;
-        if (child.minimax > alpha && child.minimax < beta) {
-            parent.type = NodeType::PV;
-        }
-        if (move.color == BLACK && child.minimax >= parent.minimax) {
+        if (move.color == BLACK) {
+            if (child.minimax == alpha || parent.minimax == child.minimax)
+                parent.exact |= child.exact;
+            if (std::max(child.minimax, parent.minimax) > alpha || child.minimax > parent.minimax)
+                parent.exact = child.exact;
             parent.minimax = std::max(parent.minimax, child.minimax);
             alpha = std::max(alpha, parent.minimax);
-            if (parent.type != NodeType::PV)
-                parent.type = NodeType::MIN;
         }
-        if (move.color == WHITE && child.minimax <= parent.minimax) {
+        if (move.color == WHITE) {
+            if (child.minimax == beta || parent.minimax == child.minimax)
+                parent.exact |= child.exact;
+            if (std::min(child.minimax, parent.minimax) < beta || child.minimax < parent.minimax)
+                parent.exact = child.exact;
             parent.minimax = std::min(parent.minimax, child.minimax);
             beta = std::min(beta, parent.minimax);
-            if (parent.type != NodeType::PV)
-                parent.type = NodeType::MAX;
         }
     }
     void gen_moves(const State<size> &state, std::vector<Move> &moves) const {
@@ -104,24 +105,43 @@ template <pos_t size, typename Impl = Minimax<size>> struct PV : Impl {
     void update(Move move, minimax_t &alpha, minimax_t &beta, return_t &parent,
                 return_t &child) const {
         child.move = move;
-        if (child.minimax > alpha && child.minimax < beta) {
-            parent.child = std::make_shared<Node>(child);
-        }
         Impl::update(move, alpha, beta, parent, child);
+        if (child.type == NodeType::PV)
+            parent.child = std::make_shared<Node>(child);
+    }
+    void on_exit(const State<size> &state, minimax_t &alpha, minimax_t &beta, size_t depth,
+                 return_t &value, bool terminal) {
+        Impl::on_exit(state, alpha, beta, depth, value, terminal);
     }
 };
 
 template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
     std::vector<std::vector<Move>> moves;
     Impl impl;
+    static constexpr size_t ORDER_TABLE_SIZE = 1 << 16;
+    struct compare {
+        bool operator()(std::pair<size_t, Move> a, std::pair<size_t, Move> b) {
+            return a.first < b.first;
+        }
+    };
+    std::array<std::set<std::pair<size_t, Move>, compare>, ORDER_TABLE_SIZE> order_table;
+    size_t node_count = 0;
 
     typename Impl::return_t search(State<size> &state,
                                    typename Impl::minimax_t alpha = Impl::alpha_init(),
                                    typename Impl::minimax_t beta = Impl::beta_init(),
                                    size_t depth = 0) {
+        node_count++;
+        typename Impl::minimax_t ab = alpha, bb = beta;
         bool terminal = false;
         auto parent = impl.init_node(state, alpha, beta, depth, terminal);
         if (terminal) {
+            if (parent.minimax > ab && parent.minimax < bb)
+                parent.type = NodeType::PV;
+            else if (parent.minimax >= bb)
+                parent.type = NodeType::MAX;
+            else if (parent.minimax <= ab)
+                parent.type = NodeType::MIN;
             impl.on_exit(state, alpha, beta, depth, parent, true);
             return parent;
         }
@@ -133,21 +153,48 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
             }
         } else
             moves[depth].clear();
+
+        {
+            auto &order = order_table[state.board.board % ORDER_TABLE_SIZE];
+            for (auto &p : order) {
+                moves[depth].emplace_back(p.second);
+            }
+            order.clear();
+        }
         impl.gen_moves(state, moves[depth]);
+        bool all_exact = true;
         if (beta > alpha) {
             size_t index = 0;
             for (Move move : moves[depth]) {
                 impl.pre_update(move, alpha, beta, parent, depth, index);
                 state.play(move);
+                size_t size_before = node_count;
                 auto child = search(state, alpha, beta, depth + 1);
+                size_t subtree_size = node_count - size_before;
+                all_exact &= child.exact;
                 state.undo();
-                impl.update(move, alpha, beta, parent, child);
-                if (beta <= alpha)
+                if (child.exact) {
+                    impl.update(move, alpha, beta, parent, child);
+                    auto &order = order_table[state.board.board % ORDER_TABLE_SIZE];
+                    order.emplace(subtree_size, move);
+                }
+                if (beta <= alpha && child.exact) {
+                    all_exact = parent.exact;
                     break;
+                }
                 index++;
             }
         }
+        if (parent.minimax > ab && parent.minimax < bb)
+            parent.type = NodeType::PV;
+        else if (parent.minimax >= bb)
+            parent.type = NodeType::MAX;
+        else if (parent.minimax <= ab)
+            parent.type = NodeType::MIN;
+        parent.exact = all_exact;
         impl.on_exit(state, alpha, beta, depth, parent, false);
+        if (depth == 0)
+            node_count = 0;
         return parent;
     }
 };
@@ -168,6 +215,7 @@ template <pos_t size, typename T> struct TranspositionTable {
     TranspositionTable() { table = new Entry[SIZE]; }
     ~TranspositionTable() { delete[] table; }
     void insert(const State<size> &state, const T &val) {
+        return;
         size_t hash = hasher(state);
         Entry &e = table[hash % SIZE];
         e.hash = hash;
@@ -178,6 +226,7 @@ template <pos_t size, typename T> struct TranspositionTable {
         e.valid = true;
     }
     T *lookup(const State<size> &state) {
+        return nullptr;
         size_t hash = hasher(state);
         Entry *e = &table[hash % SIZE];
         if (e->valid && e->hash == hash && e->board == state.board &&
@@ -218,9 +267,8 @@ struct IterativeDeepening {
         TranspositionTable<size, TTEntry> tt;
         TTEntry *entry = nullptr;
         size_t cutoff = 0;
-
-        static constexpr minimax_t alpha_init() { return -size; }
-        static constexpr minimax_t beta_init() { return size; }
+        static constexpr minimax_t alpha_init() { return Impl::alpha_init(); }
+        static constexpr minimax_t beta_init() { return Impl::beta_init(); }
 
         return_t init_node(State<size> &state, minimax_t &alpha, minimax_t &beta, size_t depth,
                            bool &terminal) {
@@ -242,10 +290,10 @@ struct IterativeDeepening {
                 if (entry->node.type == NodeType::PV) {
                     terminal = true;
                     return entry->node;
-                } else if (entry->node.type == NodeType::MIN) {
+                } else if (entry->node.type == NodeType::MAX) {
                     alpha = std::max(alpha, entry->node.minimax);
                     return entry->node;
-                } else if (entry->node.type == NodeType::MAX) {
+                } else if (entry->node.type == NodeType::MIN) {
                     beta = std::min(beta, entry->node.minimax);
                     return entry->node;
                 }
@@ -253,7 +301,7 @@ struct IterativeDeepening {
             return true_score(state.to_play == BLACK ? alpha_init() : beta_init());
         }
         void on_exit(const State<size> &state, minimax_t &alpha, minimax_t &beta, size_t depth,
-                     const return_t &value, bool terminal) {
+                     return_t &value, bool terminal) {
             if (value.exact)
                 tt.insert(state, TTEntry(value));
             Impl::on_exit(state, alpha, beta, depth, value, terminal);
@@ -261,12 +309,13 @@ struct IterativeDeepening {
         void gen_moves(const State<size> &state, std::vector<Move> &moves) {
             // init with best move from TT entry
             // except make sure pass is always first
-            moves.emplace_back(state.to_play);
+            // moves.emplace_back(state.to_play);
             if (entry)
                 moves.emplace_back(entry->node.best_move);
 
             entry = nullptr; // this pointer may be invalidated by insertion of child nodes, null it
                              // for safety
+
             Impl::gen_moves(state, moves);
         }
         void update(Move move, minimax_t &alpha, minimax_t &beta, return_t &parent,
@@ -282,25 +331,27 @@ struct IterativeDeepening {
     search(State<size> &state, typename ImplWrapper::minimax_t alpha = Impl::alpha_init(),
            typename ImplWrapper::minimax_t beta = Impl::beta_init(), size_t depth = 0) {
         impl.impl.cutoff = 1;
-        int last_minimax = 0;
+        typename ImplWrapper::minimax_t last_minimax = 0;
+        std::srand(unsigned(std::time(0)));
         while (true) {
             auto aspiration = impl.search(state, last_minimax - 1, last_minimax + 1, depth);
-            if (aspiration.type == NodeType::PV) {
-                if (callback)
-                    callback(aspiration);
-                if (aspiration.exact)
-                    return aspiration;
-                last_minimax = aspiration.minimax;
-                impl.impl.cutoff += 5;
+            std::cout << int(aspiration.type) << std::endl;
+            if (callback)
+                callback(aspiration);
+            if (aspiration.exact && aspiration.type == NodeType::PV)
+                return aspiration;
+            last_minimax = aspiration.minimax;
+            impl.impl.cutoff += 1;
+            if (aspiration.type == NodeType::PV)
                 continue;
-            }
             auto val = impl.search(state, alpha, beta, depth);
             if (callback)
                 callback(val);
-            if (val.exact)
+            std::cout << int(val.type) << std::endl;
+            if (val.exact && val.type == NodeType::PV)
                 return val;
             last_minimax = val.minimax;
-            impl.impl.cutoff += 10;
+            impl.impl.cutoff += 1;
         }
     }
 };
@@ -320,7 +371,7 @@ template <pos_t size, typename Impl> struct Metrics : Impl {
         return Impl::init_node(state, alpha, beta, depth, terminal);
     }
     void on_exit(const State<size> &state, minimax_t alpha, minimax_t beta, size_t depth,
-                 const return_t &value, bool terminal) {
+                 return_t &value, bool terminal) {
         num_nodes++;
         if (value.type == NodeType::PV && value.exact)
             bmtable[state.board][value.minimax]++;
@@ -332,7 +383,7 @@ template <pos_t size, typename Impl> struct NewickTree : Impl {
     typedef typename Impl::return_t return_t;
     typedef typename Impl::minimax_t minimax_t;
 
-    size_t tree_depth_cutoff = 8;
+    size_t tree_depth_cutoff = 4;
     std::string output_filename = "searchtree.nhx";
 
     std::stringstream output;
@@ -340,12 +391,15 @@ template <pos_t size, typename Impl> struct NewickTree : Impl {
     size_t node_count = 0;
     std::stack<size_t> size_before;
     std::stack<size_t> max_depth;
+    std::stack<minimax_t> alpha_before, beta_before;
 
     return_t init_node(State<size> &state, minimax_t &alpha, minimax_t &beta, size_t depth,
                        bool &terminal) {
         if (depth == 0)
             max_depth.push(0);
         max_depth.push(depth);
+        alpha_before.push(alpha);
+        beta_before.push(beta);
         size_before.push(node_count);
         node_count++;
         return Impl::init_node(state, alpha, beta, depth, terminal);
@@ -364,10 +418,14 @@ template <pos_t size, typename Impl> struct NewickTree : Impl {
             output << ",";
     }
     void on_exit(const State<size> &state, minimax_t alpha, minimax_t beta, size_t depth,
-                 const return_t &value, bool terminal) {
+                 return_t &value, bool terminal) {
         size_t last_depth = max_depth.top();
         size_t subtree_size = node_count - size_before.top();
         size_before.pop();
+        minimax_t prev_alpha = alpha_before.top();
+        alpha_before.pop();
+        minimax_t prev_beta = beta_before.top();
+        beta_before.pop();
         if (!terminal) {
             if (need_close.top())
                 output << ")";
@@ -387,10 +445,11 @@ template <pos_t size, typename Impl> struct NewickTree : Impl {
             else if (value.type == NodeType::NIL)
                 output << "NIL";
             output << ":exact=" << value.exact;
-            output << ":alpha=" << alpha;
-            output << ":beta=" << beta;
+            output << ":alpha=" << prev_alpha << "->" << alpha;
+            output << ":beta=" << prev_beta << "->" << beta;
             output << ":subtree_size=" << subtree_size;
             output << ":max_depth=" << last_depth;
+            output << ":to_play=" << state.to_play;
             output << "]";
         }
         max_depth.pop();

@@ -15,7 +15,9 @@ template <pos_t size, typename Impl> struct Full : Impl {
         if ((minimax == int(size) || minimax == -int(size)) &&
             state.legal_moves(state.to_play.flip()) == 0) {
             terminal = true;
-            return return_t(minimax);
+            return_t node =  return_t(minimax);
+            //node.type = NodeType::PV;
+            return node;
         }
         return Impl::init_node(state, alpha, beta, depth, terminal);
     }

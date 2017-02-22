@@ -10,7 +10,7 @@ template <pos_t size> struct GoodPlayer {
     void atari_moves(Cell color, pos_t &legal, std::vector<Move> &moves) const {
         pos_t capturing = state.capturing_moves(color);
         for (pos_t i = 0; i < size; i++) {
-            if (legal & (1 << i) && capturing & (1 << i)) {
+            if ((legal & (1 << i)) && (capturing & (1 << i))) {
                 moves.emplace_back(color, i);
                 legal &= ~(1 << i);
             }
@@ -63,29 +63,38 @@ template <pos_t size> struct GoodPlayer {
     void moves(Cell color, std::vector<Move> &moves) const {
         pos_t legal = state.legal_moves(color);
 
+        // symmetry at root
+        if (state.past.size() == 0) {
+            legal &= ((1 << ((size - 1) / 2 + 1)) - 1); // mirror moves
+            legal &= ~1;                                // and first cell
+        }
+
         // if moves is already initialized, prune any illegal moves and update legal
         bool has_pass = false;
-        for (size_t i = 0; i < moves.size(); i++) {
+        for (size_t i = 0; i < moves.size();) {
             Move m = moves[i];
-            assert(m.color == color);
-            if (m.is_pass)
-                has_pass = true;
-            else {
-                if (!(legal & (1 << m.position)))
-                    moves.erase(moves.begin() + i--);
-                else
-                    legal &= ~(1 << m.position);
+            if (m.color != color) {
+                moves.erase(moves.begin() + i);
+            } else {
+                if (m.is_pass) {
+                    if (has_pass)
+                        moves.erase(moves.begin() + i);
+                    else
+                        i++;
+                    has_pass = true;
+                } else {
+                    if ((legal & (1 << m.position)) == 0)
+                        moves.erase(moves.begin() + i);
+                    else {
+                        legal &= ~(1 << m.position);
+                        i++;
+                    }
+                }
             }
         }
 
         if (!has_pass)
             moves.emplace_back(color);
-
-        // symmetry at root
-        if (legal == ((1 << size) - 1)) {
-            legal &= ((1 << ((size - 1) / 2 + 1)) - 1); // mirror moves
-            legal &= ~1;                                // and first cell
-        }
 
         cell_2_conjecture_simple(color, legal, moves);
         cell_2_conjecture_full(color, legal, moves);
