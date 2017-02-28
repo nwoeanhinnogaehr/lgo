@@ -12,7 +12,7 @@ void configure_parser(cli::Parser &parser) {
                              "Minimax guess. Overrides alpha and beta options.");
     parser.set_optional<std::vector<std::string>>(
         "", "state", std::vector<std::string>(),
-        "Moves in the form {position}{color}, where color is b or w");
+        "Moves in the form {color}{position}, where color is b or w");
 }
 
 int main(int argc, char **argv) {
