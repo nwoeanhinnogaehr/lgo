@@ -62,7 +62,17 @@ template <pos_t size> struct GoodPlayer {
             }
         }
     }
-    void safe_moves(Cell color, pos_t &legal, std::vector<Move> &moves) const {}
+    void safe_moves(Cell color, pos_t &legal, std::vector<Move> &moves) const {
+        for (pos_t i = 1; i < size - 1; i++) {
+            if (legal & (1 << i)) {
+                if ((state.board.get(i-1) != color.flip() && state.board.get(i+1).is_stone()) ||
+                        (state.board.get(i+1) != color.flip() && state.board.get(i-1).is_stone())) {
+                    moves.emplace_back(color, i);
+                    legal &= ~(1 << i);
+                }
+            }
+        }
+    }
     void other_moves(Cell color, pos_t &legal, std::vector<Move> &moves) const {
         // add all other legal moves
         for (pos_t i = 1; i < size - 1; i++)
@@ -112,7 +122,7 @@ template <pos_t size> struct GoodPlayer {
         cell_2_conjecture_simple(color, legal, moves);
         cell_2_conjecture_full(color, legal, moves);
         atari_moves(color, legal, moves);
-        safe_moves(color, legal, moves);
+        //safe_moves(color, legal, moves);
         other_moves(color, legal, moves);
         /*
         int scbefore = state.board.minimax();

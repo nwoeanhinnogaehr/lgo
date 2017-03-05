@@ -1,5 +1,6 @@
+#include "lgo.hpp"
 #include "ab.hpp"
-constexpr pos_t size = 8;
+constexpr pos_t size = 9;
 int main() {
     State<size> state;
     while (true) {
@@ -11,6 +12,7 @@ int main() {
             state.play(Move(BLACK, std::stoi(s.substr(1))-1));
         else if (tolower(s[0]) == 'w')
             state.play(Move(WHITE, std::stoi(s.substr(1))-1));
+        else if (tolower(s[0]) == 'f');
         else {
             std::cout << state.board << " eval " << state.board.minimax() << " got " << s << std::endl;
             if (state.board.minimax() != std::stoi(s))

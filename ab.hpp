@@ -133,7 +133,8 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
     std::vector<std::vector<Move>> moves;
     Impl impl;
     static constexpr size_t ORDER_TABLE_SIZE = 1 << 22;
-    std::vector<std::vector<Move>> order_table = std::vector<std::vector<Move>>(ORDER_TABLE_SIZE);
+    std::vector<std::vector<std::pair<int, Move>>> order_table =
+       std::vector<std::vector<std::pair<int, Move>>>(ORDER_TABLE_SIZE);
     size_t node_count = 0;
 
     typename Impl::return_t search(State<size> &state,
@@ -168,8 +169,12 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
         if (beta > alpha) {
             auto &order =
                 order_table[(murmur(state.board.board) ^ murmur(depth)) % ORDER_TABLE_SIZE];
+            if (state.to_play == BLACK)
+                std::sort(order.begin(), order.end(), [](auto a, auto b) { return a.first > b.first; });
+            else
+                std::sort(order.begin(), order.end(), [](auto a, auto b) { return a.first < b.first; });
             for (auto &p : order) {
-                moves[depth].emplace_back(p);
+                moves[depth].emplace_back(p.second);
             }
             order.clear();
             impl.gen_moves(state, moves[depth]);
@@ -177,16 +182,16 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
             for (Move move : moves[depth]) {
                 impl.pre_update(move, alpha, beta, parent, depth, index);
                 state.play(move);
-                // size_t size_before = node_count;
+                //size_t size_before = node_count;
                 auto child = search(state, alpha, beta, depth + 1);
-                // size_t subtree_size = node_count - size_before;
+                //size_t subtree_size = node_count - size_before;
                 all_exact &= child.exact;
                 state.undo();
                 if (child.exact) {
                     impl.update(move, alpha, beta, parent, child);
                     auto &order =
                         order_table[(murmur(state.board.board) ^ murmur(depth)) % ORDER_TABLE_SIZE];
-                    order.emplace_back(move);
+                    order.emplace_back(child.minimax, move);
                 }
                 auto alpha_inexact = alpha;
                 auto beta_inexact = beta;
@@ -383,34 +388,38 @@ struct IterativeDeepening {
             }
             auto g = f;
             auto lowerbound = alpha, upperbound = beta;
+            int iter = 0;
             while (lowerbound < upperbound) {
-                //std::cout << "MTD(f) in [" << lowerbound << ", " << upperbound << "]" << std::endl;
+                // std::cout << "MTD(f) in [" << lowerbound << ", " << upperbound << "]" <<
+                // std::endl;
                 typename ImplWrapper::minimax_t b;
                 if (g == lowerbound)
                     b = g + 1;
                 else
                     b = g;
-                val = impl.search(state, b-1, b, depth);
+                // impl.impl.output_filename = "searchtree-" + std::to_string(iter) + ".nhx";
+                val = impl.search(state, b - 1, b, depth);
                 g = val.minimax;
                 if (g < b)
                     upperbound = g;
                 else
                     lowerbound = g;
+                iter++;
             }
             /*std::cout << "Result type: " << (val.exact ? "exact " : "inexact ") << val.type
                       << std::endl;*/
             if (callback)
                 callback(val);
-            //std::cout << std::endl;
-            //std::cerr << '.' << std::flush;
+            // std::cout << std::endl;
+            // std::cerr << '.' << std::flush;
             if (val.exact)
                 return val;
-            //if (val.exact && val.type == NodeType::MIN)
-                //beta = std::min(beta, val.minimax);
-            //if (val.exact && val.type == NodeType::MAX)
-                //alpha = std::max(alpha, val.minimax);
+            // if (val.exact && val.type == NodeType::MIN)
+            // beta = std::min(beta, val.minimax);
+            // if (val.exact && val.type == NodeType::MAX)
+            // alpha = std::max(alpha, val.minimax);
             f = val.minimax;
-            //last_minimax = std::max(alpha, std::min(beta, last_minimax));
+            // last_minimax = std::max(alpha, std::min(beta, last_minimax));
             impl.impl.cutoff += 2;
         }
     }

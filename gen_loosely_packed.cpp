@@ -1,9 +1,9 @@
-#include <iostream>
-#include <algorithm>
 #include "ab.hpp"
 #include "conjectures.hpp"
+#include <algorithm>
+#include <iostream>
 
-constexpr pos_t size = 8;
+constexpr pos_t size = 9;
 
 int main() {
     auto stable_boards = conjectures::Stability<size, Minimax<size>>::compute_stable_boards();
@@ -17,18 +17,23 @@ int main() {
         }
         auto cmp = [](auto a, auto b) { return a.first < b.first; };
         std::sort(moves.begin(), moves.end(), cmp);
-        //do {
-            IterativeDeepening<size, AlphaBeta, Impl> ab;
-            State<size> state;
-            for (auto p : moves) {
-                state.play(p.second);
-                std::cout << p.second.color << p.second.position + 1 << " ";
+        do {
+            for (int i = 0; i < 2; i++) {
+                IterativeDeepening<size, AlphaBeta, Impl> ab;
+                State<size> state;
+                for (auto p : moves) {
+                    state.play(p.second);
+                    std::cout << p.second.color << p.second.position + 1 << " ";
+                }
+                if (i == 1) {
+                    state.to_play = state.to_play.flip();
+                    std::cout << "F ";
+                }
+                auto val = ab.search(state, board.minimax() - 1, board.minimax() + 1);
+                std::cout << val.minimax;
+                std::cerr << " " << board.minimax();
+                std::cout << std::endl;
             }
-            state.to_play = BLACK;
-            auto val = ab.search(state, board.minimax() - 1, board.minimax() + 1);
-            std::cout << val.minimax;
-            std::cerr << " " << board.minimax();
-            std::cout << std::endl;
-        //} while (std::next_permutation(moves.begin(), moves.end(), cmp));
+        } while (std::next_permutation(moves.begin(), moves.end(), cmp));
     }
 }
