@@ -220,7 +220,7 @@ template <pos_t size> struct History<size, std::enable_if_t<(size < 10)>> {
 
 // Zobrist hashing for states.
 template <pos_t size, typename Hash = size_t> struct ZobristHasher {
-    static constexpr size_t MAX_DEPTH = 100;
+    static constexpr size_t MAX_DEPTH = 1000;
     Hash table[MAX_DEPTH][size + 1][CELL_MAX];
     ZobristHasher() {
         std::random_device rd;
@@ -254,7 +254,6 @@ template <pos_t size> struct State {
 
     bool terminal() const { return game_state == GAME_OVER; }
     void play(Move move) {
-        std::fill(info_cache, info_cache + CELL_MAX, optional<Info>{});
         past.emplace(game_state, board, move, hash);
         hash = hasher.update(hash, past.size(), move);
         assert(game_state != GAME_OVER);
@@ -266,6 +265,7 @@ template <pos_t size> struct State {
         } else {
             assert(legal_moves(move.color) & 1 << move.position);
             assert(board.get(move.position).is_empty());
+            std::fill(info_cache, info_cache + CELL_MAX, optional<Info>{});
             board.set(move.position, move.color);
             board.clear_captured(move.position);
             assert(!history.contains(board));
