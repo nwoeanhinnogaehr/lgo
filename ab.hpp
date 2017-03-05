@@ -385,8 +385,6 @@ struct IterativeDeepening {
         impl.impl.cutoff = 1;
         typename ImplWrapper::minimax_t f = 0;
         f = std::max(alpha + 1, std::min(beta - 1, f));
-        beta = Impl::beta_init();
-        alpha = Impl::alpha_init();
         std::srand(unsigned(std::time(0)));
         while (true) {
             typename Impl::return_t val(f);
