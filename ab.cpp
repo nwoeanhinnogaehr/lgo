@@ -3,7 +3,7 @@
 #include "conjectures.hpp"
 #include <iostream>
 
-constexpr pos_t size = 7;
+constexpr pos_t size = 9;
 
 void configure_parser(cli::Parser &parser) {
     parser.set_optional<int>("a", "alpha", -size, "Initial alpha value");

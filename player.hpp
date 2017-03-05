@@ -1,6 +1,7 @@
 #pragma once
 
 #include "lgo.hpp"
+#include <algorithm>
 
 template <pos_t size> struct GoodPlayer {
     const State<size> &state;
@@ -9,11 +10,19 @@ template <pos_t size> struct GoodPlayer {
 
     void atari_moves(Cell color, pos_t &legal, std::vector<Move> &moves) const {
         pos_t capturing = state.capturing_moves(color);
-        for (pos_t i = 0; i < size; i++) {
+        for (pos_t i = 1; i < size-1; i++) {
             if ((legal & (1 << i)) && (capturing & (1 << i))) {
                 moves.emplace_back(color, i);
                 legal &= ~(1 << i);
             }
+        }
+        if ((legal & 1) && (capturing & 1)) {
+            moves.emplace_back(color, 0);
+            legal &= ~1;
+        }
+        if ((legal & (1 << (size - 1))) && (capturing & (1 << (size - 1)))) {
+            moves.emplace_back(color, size - 1);
+            legal &= ~(1 << (size - 1));
         }
     }
     void cell_2_conjecture_simple(Cell color, pos_t &legal, std::vector<Move> &moves) const {
@@ -56,9 +65,13 @@ template <pos_t size> struct GoodPlayer {
     void safe_moves(Cell color, pos_t &legal, std::vector<Move> &moves) const {}
     void other_moves(Cell color, pos_t &legal, std::vector<Move> &moves) const {
         // add all other legal moves
-        for (pos_t i = 0; i < size; i++)
+        for (pos_t i = 1; i < size - 1; i++)
             if (legal & (1 << i))
                 moves.emplace_back(color, i);
+        if (legal & 1)
+            moves.emplace_back(color, 0);
+        if (legal & (1 << (size - 1)))
+            moves.emplace_back(color, size - 1);
     }
     void moves(Cell color, std::vector<Move> &moves) const {
         pos_t legal = state.legal_moves(color);
@@ -101,5 +114,27 @@ template <pos_t size> struct GoodPlayer {
         atari_moves(color, legal, moves);
         safe_moves(color, legal, moves);
         other_moves(color, legal, moves);
+        /*
+        int scbefore = state.board.minimax();
+        std::vector<std::pair<int, Move>> ms;
+        const std::vector<int> weights{-1,2,1,1,1,1,2,-1};
+        for (size_t i = 0; i < moves.size(); i++) {
+            Move &m = moves[i];
+            Board<size> b = state.board;
+            if (!m.is_pass) {
+                b.set(m.position, m.color);
+                b.clear_captured(m.position);
+            }
+            int score = b.minimax();
+            score = score - scbefore;
+            if (!m.is_pass)
+                score += weights[m.position];
+            score += moves.size() - i;
+            ms.emplace_back(score, m);
+        }
+        std::sort(ms.begin(), ms.end(), [](const std::pair<int, Move> &a, const std::pair<int, Move> &b) { return a.first > b.first; });
+        for (size_t i = 0; i < moves.size(); i++) {
+            moves[i] = ms[i].second;
+        }*/
     }
 };

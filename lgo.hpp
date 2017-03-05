@@ -220,7 +220,7 @@ template <pos_t size> struct History<size, std::enable_if_t<(size < 10)>> {
 
 // Zobrist hashing for states.
 template <pos_t size, typename Hash = size_t> struct ZobristHasher {
-    static constexpr size_t MAX_DEPTH = 1000;
+    static constexpr size_t MAX_DEPTH = 100;
     Hash table[MAX_DEPTH][size + 1][CELL_MAX];
     ZobristHasher() {
         std::random_device rd;
@@ -234,7 +234,7 @@ template <pos_t size, typename Hash = size_t> struct ZobristHasher {
     }
     Hash update(Hash hash, size_t depth, Move move) {
         assert(depth < MAX_DEPTH);
-        return hash ^ table[depth][move.is_pass ? move.position + 1 : 0][move.color];
+        return hash ^ table[depth][move.is_pass ? 0 : move.position + 1][move.color.value];
     }
 };
 
@@ -242,7 +242,7 @@ template <pos_t size> struct State {
     enum GameState { NORMAL, PASS, GAME_OVER } game_state = NORMAL;
     Board<size> board;
     History<size> history;
-    std::stack<std::tuple<GameState, Board<size>, Move>> past;
+    std::stack<std::tuple<GameState, Board<size>, Move, size_t>> past;
     Cell to_play = BLACK;
     size_t hash = 0;
     static ZobristHasher<size> hasher;
@@ -255,8 +255,8 @@ template <pos_t size> struct State {
     bool terminal() const { return game_state == GAME_OVER; }
     void play(Move move) {
         std::fill(info_cache, info_cache + CELL_MAX, optional<Info>{});
+        past.emplace(game_state, board, move, hash);
         hash = hasher.update(hash, past.size(), move);
-        past.emplace(game_state, board, move);
         assert(game_state != GAME_OVER);
         if (move.is_pass) {
             if (game_state == NORMAL)
@@ -281,12 +281,12 @@ template <pos_t size> struct State {
         GameState gs = std::get<0>(prev);
         Board<size> b = std::get<1>(prev);
         Move m = std::get<2>(prev);
+        hash = std::get<3>(prev);
         if (!(b == board))
             history.remove(board);
         game_state = gs;
         board = b;
         to_play = m.color;
-        hash = hasher.update(hash, past.size(), m);
     }
 
     pos_t capturing_moves(Cell color) const {

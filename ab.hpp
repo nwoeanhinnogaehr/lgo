@@ -140,8 +140,8 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
                                    typename Impl::minimax_t alpha = Impl::alpha_init(),
                                    typename Impl::minimax_t beta = Impl::beta_init(),
                                    size_t depth = 0) {
-        node_count++;
         typename Impl::minimax_t ab = alpha, bb = beta;
+        node_count++;
         bool terminal = false;
         auto parent = impl.init_node(state, alpha, beta, depth, terminal);
         if (terminal) {
@@ -163,21 +163,23 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
         } else
             moves[depth].clear();
 
-        auto &order = order_table[(murmur(state.board.board) ^ murmur(depth)) % ORDER_TABLE_SIZE];
-        for (auto &p : order) {
-            moves[depth].emplace_back(p);
-        }
-        order.clear();
-        impl.gen_moves(state, moves[depth]);
         bool all_exact = true;
+        auto parent_inexact = parent;
         if (beta > alpha) {
+            auto &order =
+                order_table[(murmur(state.board.board) ^ murmur(depth)) % ORDER_TABLE_SIZE];
+            for (auto &p : order) {
+                moves[depth].emplace_back(p);
+            }
+            order.clear();
+            impl.gen_moves(state, moves[depth]);
             size_t index = 0;
             for (Move move : moves[depth]) {
                 impl.pre_update(move, alpha, beta, parent, depth, index);
                 state.play(move);
-                size_t size_before = node_count;
+                // size_t size_before = node_count;
                 auto child = search(state, alpha, beta, depth + 1);
-                size_t subtree_size = node_count - size_before;
+                // size_t subtree_size = node_count - size_before;
                 all_exact &= child.exact;
                 state.undo();
                 if (child.exact) {
@@ -186,6 +188,10 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
                         order_table[(murmur(state.board.board) ^ murmur(depth)) % ORDER_TABLE_SIZE];
                     order.emplace_back(move);
                 }
+                auto alpha_inexact = alpha;
+                auto beta_inexact = beta;
+                impl.update(move, alpha_inexact, beta_inexact, parent_inexact, child);
+
                 if (beta <= alpha && child.exact) {
                     all_exact = parent.exact;
                     break;
@@ -193,13 +199,18 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
                 index++;
             }
         }
+        parent.exact = all_exact;
+        if (!parent.exact) {
+            parent_inexact.exact = all_exact;
+            parent = parent_inexact;
+        }
+
         if (parent.minimax > ab && parent.minimax < bb)
             parent.type = NodeType::PV;
         else if (parent.minimax >= bb)
             parent.type = NodeType::MAX;
         else if (parent.minimax <= ab)
             parent.type = NodeType::MIN;
-        parent.exact = all_exact;
         impl.on_exit(state, alpha, beta, depth, parent, false);
         if (depth == 0)
             node_count = 0;
@@ -212,8 +223,10 @@ template <pos_t size, typename T> struct TranspositionTable {
         Board<size> board;
         History<size> history;
         typename State<size>::GameState game_state;
+        Cell to_play = EMPTY;
         size_t hash;
         T val;
+        size_t entry_score = 0;
         bool valid = false;
     };
     static constexpr size_t SIZE = 1 << 16;
@@ -222,24 +235,38 @@ template <pos_t size, typename T> struct TranspositionTable {
 
     TranspositionTable() { table = new Entry[SIZE]; }
     ~TranspositionTable() { delete[] table; }
-    void insert(const State<size> &state, const T &val) {
-        return;
+    void insert(const State<size> &state, const T &val, size_t entry_score) {
+        // don't bother with nodes that are not very useful
+        if (!val.node.exact || entry_score < 100)
+            return;
         size_t hash = hasher(state);
         Entry &e = table[hash % SIZE];
+        if (e.valid) {
+            // replacement scheme
+            if (e.entry_score >= entry_score)
+                return;
+        }
         e.hash = hash;
         e.board = state.board;
         e.history = state.history;
         e.game_state = state.game_state;
         e.val = val;
+        e.val.score = entry_score;
+        e.to_play = state.to_play;
+        e.entry_score = entry_score;
         e.valid = true;
     }
     T *lookup(const State<size> &state) {
-        return nullptr;
         size_t hash = hasher(state);
         Entry *e = &table[hash % SIZE];
-        if (e->valid && e->hash == hash && e->board == state.board &&
-            e->game_state == state.game_state && e->history == state.history)
+        if (e->valid && e->hash == hash && e->board == state.board && e->to_play == state.to_play &&
+            e->game_state == state.game_state && e->history == state.history) {
+            // std::cout << "hit tt " << e->entry_score << std::endl;
             return &e->val;
+        } else if (e->valid) {
+            // std::cout << "hash collision: " << e->board << " " << state.board  << " " << hash <<
+            // std::endl;
+        }
         return nullptr;
     }
 };
@@ -254,6 +281,7 @@ struct IterativeDeepening {
     struct TTEntry {
         TTEntry() : node(0) {}
         TTEntry(Node node) : node(node) {}
+        size_t score;
         Node node;
     };
 
@@ -274,11 +302,16 @@ struct IterativeDeepening {
         TranspositionTable<size, TTEntry> tt;
         TTEntry *entry = nullptr;
         size_t cutoff = 0;
+        std::stack<size_t> size_before;
+        size_t pnode_count = 0;
+
         static constexpr minimax_t alpha_init() { return Impl::alpha_init(); }
         static constexpr minimax_t beta_init() { return Impl::beta_init(); }
 
         return_t init_node(State<size> &state, minimax_t &alpha, minimax_t &beta, size_t depth,
                            bool &terminal) {
+            size_before.push(pnode_count);
+            pnode_count++;
             return_t implv = return_t(Impl::init_node(state, alpha, beta, depth, terminal));
             if (terminal)
                 return implv;
@@ -294,32 +327,31 @@ struct IterativeDeepening {
             // hit true transposition table entry, return score
             entry = tt.lookup(state);
             if (entry && entry->node.exact) {
+                pnode_count += entry->score;
                 if (entry->node.type == NodeType::PV) {
                     terminal = true;
+                    // std::cout << "prune " << entry->node.minimax << "\n";
                     return entry->node;
                 } else if (entry->node.type == NodeType::MAX) {
+                    // if (alpha < beta - 2)
                     alpha = std::max(alpha, entry->node.minimax);
-                    return entry->node;
                 } else if (entry->node.type == NodeType::MIN) {
+                    // if (alpha < beta - 2)
                     beta = std::min(beta, entry->node.minimax);
-                    return entry->node;
                 }
             }
-            return true_score(state.to_play == BLACK ? alpha_init() : beta_init());
+            return true_score(state.to_play == BLACK ? alpha : beta);
         }
         void on_exit(const State<size> &state, minimax_t &alpha, minimax_t &beta, size_t depth,
                      return_t &value, bool terminal) {
-            if (value.exact)
-                tt.insert(state, TTEntry(value));
             Impl::on_exit(state, alpha, beta, depth, value, terminal);
+            size_t subtree_size = pnode_count - size_before.top();
+            size_before.pop();
+            tt.insert(state, TTEntry(value), subtree_size);
+            if (depth == 0)
+                pnode_count = 0;
         }
         void gen_moves(const State<size> &state, std::vector<Move> &moves) {
-            // init with best move from TT entry
-            // except make sure pass is always first
-            // moves.emplace_back(state.to_play);
-            if (entry)
-                moves.emplace_back(entry->node.best_move);
-
             entry = nullptr; // this pointer may be invalidated by insertion of child nodes, null it
                              // for safety
 
@@ -334,50 +366,52 @@ struct IterativeDeepening {
 
     ABImpl<size, ImplWrapper> impl;
     std::function<void(typename ImplWrapper::return_t)> callback;
+    size_t give_up = 0;
+
     typename ImplWrapper::return_t
     search(State<size> &state, typename ImplWrapper::minimax_t alpha = Impl::alpha_init(),
            typename ImplWrapper::minimax_t beta = Impl::beta_init(), size_t depth = 0) {
         impl.impl.cutoff = 1;
-        typename ImplWrapper::minimax_t last_minimax = 0;
-        last_minimax = std::max(alpha + 1, std::min(beta - 1, last_minimax));
+        typename ImplWrapper::minimax_t f = 0;
+        f = std::max(alpha + 1, std::min(beta - 1, f));
         std::srand(unsigned(std::time(0)));
         while (true) {
-            std::cout << "Doing aspiration search around " << last_minimax << std::endl;
-            auto aspiration = impl.search(state, last_minimax - 1, last_minimax + 1, depth);
-            std::cout << "Result type: " << (aspiration.exact ? "exact " : "inexact ")
-                      << aspiration.type << std::endl;
-            if (callback)
-                callback(aspiration);
-            std::cout << std::endl;
-            if (aspiration.exact && aspiration.type == NodeType::PV)
-                return aspiration;
-            if (aspiration.exact && aspiration.type == NodeType::MIN)
-                beta = std::min(beta, aspiration.minimax);
-            if (aspiration.exact && aspiration.type == NodeType::MAX)
-                alpha = std::max(alpha, aspiration.minimax);
-            last_minimax = aspiration.minimax;
-            last_minimax = std::max(alpha, std::min(beta, last_minimax));
-            impl.impl.cutoff += 1;
-            if (aspiration.type == NodeType::PV)
-                continue;
-            if (alpha < beta - 2) {
-                std::cout << "Doing full search in [" << alpha << ", " << beta << "]" << std::endl;
-                auto val = impl.search(state, alpha, beta, depth);
-                std::cout << "Result type: " << (val.exact ? "exact " : "inexact ") << val.type
-                          << std::endl;
-                if (callback)
-                    callback(val);
-                std::cout << std::endl;
-                if (val.exact && val.type == NodeType::PV)
-                    return val;
-                if (val.exact && val.type == NodeType::MIN)
-                    beta = std::min(beta, val.minimax);
-                if (val.exact && val.type == NodeType::MAX)
-                    alpha = std::max(alpha, val.minimax);
-                last_minimax = val.minimax;
-                last_minimax = std::max(alpha, std::min(beta, last_minimax));
-                impl.impl.cutoff += 1;
+            typename Impl::return_t val(f);
+            if (impl.impl.cutoff == give_up) {
+                std::cout << "giving up\n";
+                return val;
             }
+            auto g = f;
+            auto lowerbound = alpha, upperbound = beta;
+            while (lowerbound < upperbound) {
+                //std::cout << "MTD(f) in [" << lowerbound << ", " << upperbound << "]" << std::endl;
+                typename ImplWrapper::minimax_t b;
+                if (g == lowerbound)
+                    b = g + 1;
+                else
+                    b = g;
+                val = impl.search(state, b-1, b, depth);
+                g = val.minimax;
+                if (g < b)
+                    upperbound = g;
+                else
+                    lowerbound = g;
+            }
+            /*std::cout << "Result type: " << (val.exact ? "exact " : "inexact ") << val.type
+                      << std::endl;*/
+            if (callback)
+                callback(val);
+            //std::cout << std::endl;
+            //std::cerr << '.' << std::flush;
+            if (val.exact)
+                return val;
+            //if (val.exact && val.type == NodeType::MIN)
+                //beta = std::min(beta, val.minimax);
+            //if (val.exact && val.type == NodeType::MAX)
+                //alpha = std::max(alpha, val.minimax);
+            f = val.minimax;
+            //last_minimax = std::max(alpha, std::min(beta, last_minimax));
+            impl.impl.cutoff += 2;
         }
     }
 };
