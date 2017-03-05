@@ -144,6 +144,12 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
         typename Impl::minimax_t ab = alpha, bb = beta;
         node_count++;
         bool terminal = false;
+        // passing sets bounds
+        if (state.to_play == BLACK && state.game_state == State<size>::PASS)
+            alpha = std::max(alpha, state.board.minimax());
+        if (state.to_play == WHITE && state.game_state == State<size>::PASS)
+            beta = std::min(beta, state.board.minimax());
+
         auto parent = impl.init_node(state, alpha, beta, depth, terminal);
         if (terminal) {
             if (parent.minimax > ab && parent.minimax < bb)
@@ -379,6 +385,8 @@ struct IterativeDeepening {
         impl.impl.cutoff = 1;
         typename ImplWrapper::minimax_t f = 0;
         f = std::max(alpha + 1, std::min(beta - 1, f));
+        beta = Impl::beta_init();
+        alpha = Impl::alpha_init();
         std::srand(unsigned(std::time(0)));
         while (true) {
             typename Impl::return_t val(f);
