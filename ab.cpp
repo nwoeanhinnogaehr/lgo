@@ -34,16 +34,6 @@ int main(int argc, char **argv) {
         std::cout << "cutoff=" << ab.impl.impl.cutoff << "\tminimax=" << val.minimax
                   << "\tsearched=" << ab.impl.impl.num_nodes << "\n";
         PV<size>::print_path(val.get_path(), root);
-        /*for (auto e : ab.impl.impl.bmtable) {
-            Board<size> board = e.first;
-            std::cout << board << ", ";
-            for (int i = -(int)size; i <= (int)size; i++) {
-                std::cout << e.second[i] << ", ";
-            }
-            std::cout << "\n";
-        }
-        std::cout << "\n";*/
-        ab.impl.impl.bmtable.clear();
     };
 
     int alpha = parser.get<int>("a"), beta = parser.get<int>("b");

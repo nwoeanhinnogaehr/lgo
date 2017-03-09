@@ -134,7 +134,7 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
     Impl impl;
     static constexpr size_t ORDER_TABLE_SIZE = 1 << 22;
     std::vector<std::vector<std::pair<int, Move>>> order_table =
-       std::vector<std::vector<std::pair<int, Move>>>(ORDER_TABLE_SIZE);
+        std::vector<std::vector<std::pair<int, Move>>>(ORDER_TABLE_SIZE);
     size_t node_count = 0;
 
     typename Impl::return_t search(State<size> &state,
@@ -176,9 +176,11 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
             auto &order =
                 order_table[(murmur(state.board.board) ^ murmur(depth)) % ORDER_TABLE_SIZE];
             if (state.to_play == BLACK)
-                std::sort(order.begin(), order.end(), [](auto a, auto b) { return a.first > b.first; });
+                std::sort(order.begin(), order.end(),
+                          [](auto a, auto b) { return a.first > b.first; });
             else
-                std::sort(order.begin(), order.end(), [](auto a, auto b) { return a.first < b.first; });
+                std::sort(order.begin(), order.end(),
+                          [](auto a, auto b) { return a.first < b.first; });
             for (auto &p : order) {
                 moves[depth].emplace_back(p.second);
             }
@@ -188,9 +190,9 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
             for (Move move : moves[depth]) {
                 impl.pre_update(move, alpha, beta, parent, depth, index);
                 state.play(move);
-                //size_t size_before = node_count;
+                // size_t size_before = node_count;
                 auto child = search(state, alpha, beta, depth + 1);
-                //size_t subtree_size = node_count - size_before;
+                // size_t subtree_size = node_count - size_before;
                 all_exact &= child.exact;
                 state.undo();
                 if (child.exact) {
@@ -245,6 +247,10 @@ template <pos_t size, typename T> struct TranspositionTable {
     Entry *table;
 
     TranspositionTable() { table = new Entry[SIZE]; }
+    void clear() {
+        for (size_t i = 0; i < SIZE; i++)
+            table[i].valid = false;
+    }
     ~TranspositionTable() { delete[] table; }
     void insert(const State<size> &state, const T &val, size_t entry_score) {
         // don't bother with nodes that are not very useful
@@ -272,11 +278,7 @@ template <pos_t size, typename T> struct TranspositionTable {
         Entry *e = &table[hash % SIZE];
         if (e->valid && e->hash == hash && e->board == state.board && e->to_play == state.to_play &&
             e->game_state == state.game_state && e->history == state.history) {
-            // std::cout << "hit tt " << e->entry_score << std::endl;
             return &e->val;
-        } else if (e->valid) {
-            // std::cout << "hash collision: " << e->board << " " << state.board  << " " << hash <<
-            // std::endl;
         }
         return nullptr;
     }
@@ -341,13 +343,10 @@ struct IterativeDeepening {
                 pnode_count += entry->score;
                 if (entry->node.type == NodeType::PV) {
                     terminal = true;
-                    // std::cout << "prune " << entry->node.minimax << "\n";
                     return entry->node;
                 } else if (entry->node.type == NodeType::MAX) {
-                    // if (alpha < beta - 2)
                     alpha = std::max(alpha, entry->node.minimax);
                 } else if (entry->node.type == NodeType::MIN) {
-                    // if (alpha < beta - 2)
                     beta = std::min(beta, entry->node.minimax);
                 }
             }
@@ -395,6 +394,7 @@ struct IterativeDeepening {
             auto g = f;
             auto lowerbound = alpha, upperbound = beta;
             int iter = 0;
+            bool all_exact = true;
             while (lowerbound < upperbound) {
                 // std::cout << "MTD(f) in [" << lowerbound << ", " << upperbound << "]" <<
                 // std::endl;
@@ -405,6 +405,13 @@ struct IterativeDeepening {
                     b = g;
                 // impl.impl.output_filename = "searchtree-" + std::to_string(iter) + ".nhx";
                 val = impl.search(state, b - 1, b, depth);
+                std::cout << "Result type: " << (val.exact ? "exact " : "inexact ") << val.type
+                          << std::endl;
+                if (val.exact && val.type == NodeType::MIN)
+                    beta = std::min(beta, val.minimax);
+                if (val.exact && val.type == NodeType::MAX)
+                    alpha = std::min(alpha, val.minimax);
+                all_exact &= val.exact;
                 g = val.minimax;
                 if (g < b)
                     upperbound = g;
@@ -412,20 +419,16 @@ struct IterativeDeepening {
                     lowerbound = g;
                 iter++;
             }
-            /*std::cout << "Result type: " << (val.exact ? "exact " : "inexact ") << val.type
-                      << std::endl;*/
             if (callback)
                 callback(val);
-            // std::cout << std::endl;
-            // std::cerr << '.' << std::flush;
-            if (val.exact)
+            if (all_exact) {
+                impl.impl.tt.clear();
+                val = impl.search(state, val.minimax - 1, val.minimax + 1, depth);
+                if (callback)
+                    callback(val);
                 return val;
-            // if (val.exact && val.type == NodeType::MIN)
-            // beta = std::min(beta, val.minimax);
-            // if (val.exact && val.type == NodeType::MAX)
-            // alpha = std::max(alpha, val.minimax);
+            }
             f = val.minimax;
-            // last_minimax = std::max(alpha, std::min(beta, last_minimax));
             impl.impl.cutoff += 2;
         }
     }
@@ -435,7 +438,7 @@ using IterativeDeepeningAlphaBeta = IterativeDeepening<size, AlphaBeta, Impl>;
 
 // throw random info you need in here
 template <pos_t size, typename Impl> struct Metrics : Impl {
-    std::unordered_map<Board<size>, std::unordered_map<int, int>, BoardHasher<size>> bmtable;
+    //std::unordered_map<Board<size>, std::unordered_map<int, int>, BoardHasher<size>> bmtable;
     size_t num_nodes = 0;
 
     typedef typename Impl::return_t return_t;
@@ -448,8 +451,8 @@ template <pos_t size, typename Impl> struct Metrics : Impl {
     void on_exit(const State<size> &state, minimax_t alpha, minimax_t beta, size_t depth,
                  return_t &value, bool terminal) {
         num_nodes++;
-        if (value.type == NodeType::PV && value.exact)
-            bmtable[state.board][value.minimax]++;
+        //if (value.type == NodeType::PV && value.exact)
+            //bmtable[state.board][value.minimax]++;
         Impl::on_exit(state, alpha, beta, depth, value, terminal);
     }
 };
