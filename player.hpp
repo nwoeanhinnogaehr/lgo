@@ -29,7 +29,7 @@ template <pos_t size> struct GoodPlayer {
         // it's safe to ignore the warnings. waiting for constexpr if...
         if (size < 4)
             return;
-
+/*
         if ((legal & 3) == 3 && !state.board.is_captured(1) && !state.board.is_captured(0)) {
             moves.emplace_back(color, 1);
             legal &= ~3;
@@ -38,7 +38,7 @@ template <pos_t size> struct GoodPlayer {
             !state.board.is_captured(size - 2) && !state.board.is_captured(size - 1)) {
             moves.emplace_back(color, size - 2);
             legal &= ~(3 << (size - 2));
-        }
+        }*/
         if ((legal & 3) == 3) {
             moves.emplace_back(color, 1);
             legal &= ~2;
