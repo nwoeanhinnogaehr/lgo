@@ -1,5 +1,6 @@
 #include "catch.hpp"
 #include "ab.hpp"
+#include "conjectures.hpp"
 
 TEST_CASE("alpha beta size 1", "[search]") {
     AlphaBeta<1> ab;
@@ -150,4 +151,112 @@ TEST_CASE("lgo_small pv 6:2,1,5", "[search]") {
     s.play(Move(WHITE, 1));
     s.play(Move(BLACK, 5));
     REQUIRE(ab.search(s) == -6);
+}
+
+TEST_CASE("size 5", "[search]") {
+    constexpr int size = 5;
+    using Impl = conjectures::All<size, PV<size>>;
+    IterativeDeepening<size, AlphaBeta, Impl> ab;
+    {
+        State<size> root;
+        root.play(Move(BLACK, 0));
+        REQUIRE(ab.search(root).minimax == -5);
+    }
+    {
+        State<size> root;
+        root.play(Move(BLACK, 1));
+        REQUIRE(ab.search(root).minimax == 0);
+    }
+    {
+        State<size> root;
+        root.play(Move(BLACK, 2));
+        REQUIRE(ab.search(root).minimax == 0);
+    }
+    {
+        State<size> root;
+        root.play(Move(BLACK, 3));
+        REQUIRE(ab.search(root).minimax == 0);
+    }
+    {
+        State<size> root;
+        root.play(Move(BLACK, 4));
+        REQUIRE(ab.search(root).minimax == -5);
+    }
+}
+
+TEST_CASE("size 6", "[search]") {
+    constexpr int size = 6;
+    using Impl = conjectures::All<size, PV<size>>;
+    IterativeDeepening<size, AlphaBeta, Impl> ab;
+    {
+        State<size> root;
+        root.play(Move(BLACK, 0));
+        REQUIRE(ab.search(root).minimax == -6);
+    }
+    {
+        State<size> root;
+        root.play(Move(BLACK, 1));
+        REQUIRE(ab.search(root).minimax == 1);
+    }
+    {
+        State<size> root;
+        root.play(Move(BLACK, 2));
+        REQUIRE(ab.search(root).minimax == -1);
+    }
+    {
+        State<size> root;
+        root.play(Move(BLACK, 3));
+        REQUIRE(ab.search(root).minimax == -1);
+    }
+    {
+        State<size> root;
+        root.play(Move(BLACK, 4));
+        REQUIRE(ab.search(root).minimax == 1);
+    }
+    {
+        State<size> root;
+        root.play(Move(BLACK, 5));
+        REQUIRE(ab.search(root).minimax == -6);
+    }
+}
+
+TEST_CASE("size 7", "[search]") {
+    constexpr int size = 7;
+    using Impl = conjectures::All<size, PV<size>>;
+    IterativeDeepening<size, AlphaBeta, Impl> ab;
+    {
+        State<size> root;
+        root.play(Move(BLACK, 0));
+        REQUIRE(ab.search(root).minimax == -7);
+    }
+    {
+        State<size> root;
+        root.play(Move(BLACK, 1));
+        REQUIRE(ab.search(root).minimax == 2);
+    }
+    {
+        State<size> root;
+        root.play(Move(BLACK, 2));
+        REQUIRE(ab.search(root).minimax == -2);
+    }
+    {
+        State<size> root;
+        root.play(Move(BLACK, 3));
+        REQUIRE(ab.search(root).minimax == 2);
+    }
+    {
+        State<size> root;
+        root.play(Move(BLACK, 4));
+        REQUIRE(ab.search(root).minimax == -2);
+    }
+    {
+        State<size> root;
+        root.play(Move(BLACK, 5));
+        REQUIRE(ab.search(root).minimax == 2);
+    }
+    {
+        State<size> root;
+        root.play(Move(BLACK, 6));
+        REQUIRE(ab.search(root).minimax == -7);
+    }
 }

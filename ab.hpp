@@ -403,7 +403,7 @@ struct IterativeDeepening {
                     b = g + 1;
                 else
                     b = g;
-                // impl.impl.output_filename = "searchtree-" + std::to_string(iter) + ".nhx";
+                //impl.impl.output_filename = "searchtree-" + std::to_string(iter) + ".nhx";
                 val = impl.search(state, b - 1, b, depth);
                 std::cout << "Result type: " << (val.exact ? "exact " : "inexact ") << val.type
                           << std::endl;
@@ -422,10 +422,10 @@ struct IterativeDeepening {
             if (callback)
                 callback(val);
             if (all_exact) {
-                impl.impl.tt.clear();
-                val = impl.search(state, val.minimax - 1, val.minimax + 1, depth);
-                if (callback)
-                    callback(val);
+                //impl.impl.tt.clear();
+                //val = impl.search(state, val.minimax - 1, val.minimax + 1, depth);
+                //if (callback)
+                    //callback(val);
                 return val;
             }
             f = val.minimax;
