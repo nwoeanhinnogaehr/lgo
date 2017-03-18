@@ -16,7 +16,7 @@
 
 enum class NodeType { NIL, PV, MIN, MAX };
 std::ostream &operator<<(std::ostream &os, const NodeType type) {
-    const char *names[] = {"NIL", "PV", "Min", "Max"};
+    const char *names[] = {"NIL", "PV", "upperbound", "lowerbound"};
     os << names[size_t(type)];
     return os;
 }
@@ -141,9 +141,12 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
                                    typename Impl::minimax_t alpha = Impl::alpha_init(),
                                    typename Impl::minimax_t beta = Impl::beta_init(),
                                    size_t depth = 0) {
+        assert(alpha != beta);
+
         typename Impl::minimax_t ab = alpha, bb = beta;
         node_count++;
         bool terminal = false;
+
         // passing sets bounds
         if (state.to_play == BLACK && state.game_state == State<size>::PASS)
             alpha = std::max(alpha, state.board.minimax());
@@ -396,17 +399,17 @@ struct IterativeDeepening {
             int iter = 0;
             bool all_exact = true;
             while (lowerbound < upperbound) {
-                // std::cout << "MTD(f) in [" << lowerbound << ", " << upperbound << "]" <<
-                // std::endl;
                 typename ImplWrapper::minimax_t b;
                 if (g == lowerbound)
                     b = g + 1;
                 else
                     b = g;
-                //impl.impl.output_filename = "searchtree-" + std::to_string(iter) + ".nhx";
+                std::cout << "MTD(f) in [" << (b-1) << ", " << b << "]...\t" << std::flush;
                 val = impl.search(state, b - 1, b, depth);
                 std::cout << "Result type: " << (val.exact ? "exact " : "inexact ") << val.type
                           << std::endl;
+                if (callback)
+                    callback(val);
                 if (val.exact && val.type == NodeType::MIN)
                     beta = std::min(beta, val.minimax);
                 if (val.exact && val.type == NodeType::MAX)
@@ -419,13 +422,11 @@ struct IterativeDeepening {
                     lowerbound = g;
                 iter++;
             }
-            if (callback)
-                callback(val);
             if (all_exact) {
-                //impl.impl.tt.clear();
-                //val = impl.search(state, val.minimax - 1, val.minimax + 1, depth);
-                //if (callback)
-                    //callback(val);
+                // impl.impl.tt.clear();
+                // val = impl.search(state, val.minimax - 1, val.minimax + 1, depth);
+                // if (callback)
+                // callback(val);
                 return val;
             }
             f = val.minimax;
@@ -438,7 +439,7 @@ using IterativeDeepeningAlphaBeta = IterativeDeepening<size, AlphaBeta, Impl>;
 
 // throw random info you need in here
 template <pos_t size, typename Impl> struct Metrics : Impl {
-    //std::unordered_map<Board<size>, std::unordered_map<int, int>, BoardHasher<size>> bmtable;
+    // std::unordered_map<Board<size>, std::unordered_map<int, int>, BoardHasher<size>> bmtable;
     size_t num_nodes = 0;
 
     typedef typename Impl::return_t return_t;
@@ -451,8 +452,8 @@ template <pos_t size, typename Impl> struct Metrics : Impl {
     void on_exit(const State<size> &state, minimax_t alpha, minimax_t beta, size_t depth,
                  return_t &value, bool terminal) {
         num_nodes++;
-        //if (value.type == NodeType::PV && value.exact)
-            //bmtable[state.board][value.minimax]++;
+        // if (value.type == NodeType::PV && value.exact)
+        // bmtable[state.board][value.minimax]++;
         Impl::on_exit(state, alpha, beta, depth, value, terminal);
     }
 };
@@ -473,8 +474,11 @@ template <pos_t size, typename Impl> struct NewickTree : Impl {
 
     return_t init_node(State<size> &state, minimax_t &alpha, minimax_t &beta, size_t depth,
                        bool &terminal) {
-        if (depth == 0)
+        if (depth == 0) {
             max_depth.push(0);
+            output_filename =
+                "searchtree." + std::to_string(alpha) + "," + std::to_string(beta) + ".nhx";
+        }
         max_depth.push(depth);
         alpha_before.push(alpha);
         beta_before.push(beta);
