@@ -33,7 +33,7 @@ int main(int argc, char **argv) {
     ab.callback = [&](auto val) {
         std::cout << "cutoff=" << ab.impl.impl.cutoff << "\tminimax=" << val.minimax
                   << "\tsearched=" << ab.impl.impl.num_nodes << "\n";
-        //PV<size>::print_path(val.get_path(), root);
+        PV<size>::print_path(val.get_path(), root);
     };
 
     int alpha = parser.get<int>("a"), beta = parser.get<int>("b");
