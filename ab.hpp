@@ -133,8 +133,8 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
     std::vector<std::vector<Move>> moves;
     Impl impl;
     static constexpr size_t ORDER_TABLE_SIZE = 1 << 22;
-    std::vector<std::vector<std::pair<int, Move>>> order_table =
-        std::vector<std::vector<std::pair<int, Move>>>(ORDER_TABLE_SIZE);
+    std::vector<std::vector<std::tuple<int, size_t, Move>>> order_table =
+        std::vector<std::vector<std::tuple<int, size_t, Move>>>(ORDER_TABLE_SIZE);
     size_t node_count = 0;
 
     typename Impl::return_t search(State<size> &state,
@@ -179,13 +179,17 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
             auto &order =
                 order_table[(murmur(state.board.board) ^ murmur(depth)) % ORDER_TABLE_SIZE];
             if (state.to_play == BLACK)
-                std::sort(order.begin(), order.end(),
-                          [](auto a, auto b) { return a.first > b.first; });
+                std::sort(order.begin(), order.end(), [](auto a, auto b) {
+                    return std::get<0>(a) == std::get<0>(b) ? std::get<1>(a) < std::get<1>(b)
+                                                            : std::get<0>(a) > std::get<0>(b);
+                });
             else
-                std::sort(order.begin(), order.end(),
-                          [](auto a, auto b) { return a.first < b.first; });
+                std::sort(order.begin(), order.end(), [](auto a, auto b) {
+                    return std::get<0>(a) == std::get<0>(b) ? std::get<1>(a) < std::get<1>(b)
+                                                            : std::get<0>(a) < std::get<0>(b);
+                });
             for (auto &p : order) {
-                moves[depth].emplace_back(p.second);
+                moves[depth].emplace_back(std::get<2>(p));
             }
             order.clear();
             impl.gen_moves(state, moves[depth]);
@@ -193,16 +197,16 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
             for (Move move : moves[depth]) {
                 impl.pre_update(move, alpha, beta, parent, depth, index);
                 state.play(move);
-                // size_t size_before = node_count;
+                size_t size_before = node_count;
                 auto child = search(state, alpha, beta, depth + 1);
-                // size_t subtree_size = node_count - size_before;
+                size_t subtree_size = node_count - size_before;
                 all_exact &= child.exact;
                 state.undo();
                 if (child.exact) {
                     impl.update(move, alpha, beta, parent, child);
                     auto &order =
                         order_table[(murmur(state.board.board) ^ murmur(depth)) % ORDER_TABLE_SIZE];
-                    order.emplace_back(child.minimax, move);
+                    order.emplace_back(child.minimax, subtree_size, move);
                 }
                 auto alpha_inexact = alpha;
                 auto beta_inexact = beta;
@@ -404,7 +408,7 @@ struct IterativeDeepening {
                     b = g + 1;
                 else
                     b = g;
-                std::cout << "MTD(f) in [" << (b-1) << ", " << b << "]...\t" << std::flush;
+                std::cout << "MTD(f) in [" << (b - 1) << ", " << b << "]...\t" << std::flush;
                 val = impl.search(state, b - 1, b, depth);
                 std::cout << "Result type: " << (val.exact ? "exact " : "inexact ") << val.type
                           << std::endl;
@@ -413,7 +417,7 @@ struct IterativeDeepening {
                 if (val.exact && val.type == NodeType::MIN)
                     beta = std::min(beta, val.minimax);
                 if (val.exact && val.type == NodeType::MAX)
-                    alpha = std::min(alpha, val.minimax);
+                    alpha = std::max(alpha, val.minimax);
                 all_exact &= val.exact;
                 g = val.minimax;
                 if (g < b)
@@ -421,6 +425,7 @@ struct IterativeDeepening {
                 else
                     lowerbound = g;
                 iter++;
+                std::cout << std::endl;
             }
             if (all_exact) {
                 // impl.impl.tt.clear();
