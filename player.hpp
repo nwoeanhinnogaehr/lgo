@@ -91,6 +91,10 @@ template <pos_t size> struct GoodPlayer {
             legal &= ((1 << ((size - 1) / 2 + 1)) - 1); // mirror moves
             legal &= ~1;                                // and first cell
         }
+        // symmetry when only stone is in the center on odd board sizes
+        if (size % 2 == 1 && state.past.size() == 1 && state.board.get(size/2).is_stone()) {
+            legal &= ((1 << ((size - 1) / 2 + 1)) - 1); // mirror moves
+        }
 
         // if moves is already initialized, prune any illegal moves and update legal
         bool has_pass = false;
