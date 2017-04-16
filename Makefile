@@ -1,5 +1,5 @@
 CXX = /usr/bin/g++
-CXXFLAGS += -std=c++1z -g -O3 -Wall -Wextra -march=native -Wno-unused-parameter
+CXXFLAGS += -std=c++1z -g -O3 -Wall -Wextra -march=native -Wno-unused-parameter -pthread
 #CXXFLAGS += -DNDEBUG
 OBJ_FILES := $(patsubst %.cpp,%.o,$(wildcard *.cpp))
 EXE := test ab conjecture_prover gen_loosely_packed

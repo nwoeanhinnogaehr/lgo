@@ -136,6 +136,7 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
     std::vector<std::vector<std::tuple<int, size_t, Move>>> order_table =
         std::vector<std::vector<std::tuple<int, size_t, Move>>>(ORDER_TABLE_SIZE);
     size_t node_count = 0;
+    bool quit = false;
 
     typename Impl::return_t search(State<size> &state,
                                    typename Impl::minimax_t alpha = Impl::alpha_init(),
@@ -154,6 +155,8 @@ template <pos_t size, typename Impl = Minimax<size>> struct AlphaBeta {
             beta = std::min(beta, state.board.minimax());
 
         auto parent = impl.init_node(state, alpha, beta, depth, terminal);
+        if (quit)
+            return parent;
         if (terminal) {
             if (parent.minimax > ab && parent.minimax < bb)
                 parent.type = NodeType::PV;
@@ -384,6 +387,7 @@ struct IterativeDeepening {
     ABImpl<size, ImplWrapper> impl;
     std::function<void(typename ImplWrapper::return_t)> callback;
     size_t give_up = 0;
+    typename Impl::return_t last_result = typename Impl::return_t(0);
 
     typename ImplWrapper::return_t
     search(State<size> &state, typename ImplWrapper::minimax_t alpha = Impl::alpha_init(),
@@ -408,16 +412,20 @@ struct IterativeDeepening {
                     b = g + 1;
                 else
                     b = g;
-                std::cout << "MTD(f) in [" << (b - 1) << ", " << b << "]...\t" << std::flush;
+                //std::cout << "MTD(f) in [" << (b - 1) << ", " << b << "]...\t" << std::flush;
                 val = impl.search(state, b - 1, b, depth);
-                std::cout << "Result type: " << (val.exact ? "exact " : "inexact ") << val.type
-                          << std::endl;
+                last_result = val;
+                //std::cout << "Result type: " << (val.exact ? "exact " : "inexact ") << val.type
+                          //<< std::endl;
                 if (callback)
                     callback(val);
                 if (val.exact && val.type == NodeType::MIN)
                     beta = std::min(beta, val.minimax);
                 if (val.exact && val.type == NodeType::MAX)
                     alpha = std::max(alpha, val.minimax);
+                if (val.exact) {
+                    std::cout << "found exact " << val.type << " of " << val.minimax << std::endl;
+                }
                 all_exact &= val.exact;
                 g = val.minimax;
                 if (g < b)
@@ -425,7 +433,7 @@ struct IterativeDeepening {
                 else
                     lowerbound = g;
                 iter++;
-                std::cout << std::endl;
+                //std::cout << std::endl;
             }
             if (all_exact) {
                 // impl.impl.tt.clear();
