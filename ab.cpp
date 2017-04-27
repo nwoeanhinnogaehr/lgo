@@ -79,8 +79,7 @@ int main(int argc, char **argv) {
                 }
             } else if (line[0] == 'i') {
                 std::cout << "nodes searched=" << ab.impl.impl.num_nodes << std::endl;
-                std::cout << "best guess=" << ab.last_result.minimax << std:
-                    :endl;
+                std::cout << "best guess=" << ab.last_result.minimax << std::endl;
             } else {
                 std::cout << "commands:\n"
                              "\t?\t\t\t :: show this help\n"
